@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <bytecodeTargetLevel target="21">
+      <module name="Trackr.app.Feature_Auth" target="21" />
+      <module name="Trackr.app.Feature_Splash" target="21" />
+      <module name="Trackr.app.Feature_Ticket" target="21" />
+      <module name="Trackr.app.Navigation" target="21" />
+      <module name="Trackr.data" target="11" />
+      <module name="Trackr.data.main" target="11" />
+      <module name="Trackr.data.test" target="11" />
+      <module name="Trackr.feature_auth" target="21" />
+      <module name="Trackr.Feature_S" target="21" />
+      <module name="Trackr.feature_ticket" target="21" />
+      <module name="Trackr.navigation" target="21" />
+    </bytecodeTargetLevel>
+  </component>
+</project>
