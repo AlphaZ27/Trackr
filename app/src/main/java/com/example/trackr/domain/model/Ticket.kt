@@ -22,3 +22,4 @@ data class Ticket(
     val status: TicketStatus = TicketStatus.Open,
     val resolution: String? = null
 )
+// Add assigneeID, and resolution desc to createTicketScreen

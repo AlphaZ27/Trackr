@@ -1,7 +1,17 @@
 package com.example.trackr.feature_tickets
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -16,7 +26,8 @@ import com.example.trackr.domain.model.TicketStatus
 @Composable
 fun CreateTicketScreen(
     ticketViewModel: TicketViewModel = hiltViewModel(),
-    onTicketCreated: () -> Unit
+    onTicketCreated: () -> Unit,
+    onNavigateBack: () -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -26,11 +37,18 @@ fun CreateTicketScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Create New Ticket") })
+            TopAppBar(
+                title = { Text("Create New Ticket") },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
         },
         floatingActionButton = {
             Button(
-                onClick = {
+                onClick = { //Missing assignee and resolution
                     val newTicket = Ticket(
                         name = name,
                         description = description,
@@ -85,6 +103,11 @@ fun CreateTicketScreen(
     }
 }
 
+fun Priority.displayName(): String = name.replaceFirstChar { it.uppercase() }
+fun TicketStatus.displayName(): String = name.replace(Regex("([a-z])([A-Z])"), "$1 $2")
+    .replaceFirstChar { it.uppercase() }
+
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,21 +123,35 @@ fun PriorityDropdown(
         onExpandedChange = { expanded = !expanded }
     ) {
         OutlinedTextField(
+            modifier = Modifier // .menuAnchor() by itself is deprecated and won't work
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable) // read-only
+                .fillMaxWidth(),
             value = selectedPriority.name,
             onValueChange = {},
-            readOnly = true,
+            enabled = false,
+            //readOnly = true,
             label = { Text("Priority") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.fillMaxWidth().clickable(onClick = { expanded = true })
+            //Prevents the OutlinedTextField from being greyed out
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+            //modifier = Modifier.fillMaxWidth().clickable(onClick = { expanded = true })
             //modifier = Modifier.menuAnchor().fillMaxWidth()
         )
         ExposedDropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.exposedDropdownSize() // matches width with text field
         ) {
             priorities.forEach { priority ->
                 DropdownMenuItem(
-                    text = { Text(priority.name) },
+                    text = { Text(priority.displayName()) },
                     onClick = {
                         onPrioritySelected(priority)
                         expanded = false
@@ -144,16 +181,20 @@ fun StatusDropdown(
             readOnly = true,
             label = { Text("Status") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.fillMaxWidth().clickable(onClick = { expanded = true })
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth()
+            //modifier = Modifier.fillMaxWidth().clickable(onClick = { expanded = true })
             //modifier = Modifier.menuAnchor().fillMaxWidth()
         )
         ExposedDropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.exposedDropdownSize() // matches width with text field
         ) {
             statuses.forEach { status ->
                 DropdownMenuItem(
-                    text = { Text(status.name) },
+                    text = { Text(status.displayName()) },
                     onClick = {
                         onStatusSelected(status)
                         expanded = false
@@ -198,6 +239,7 @@ fun CreateTicketScreenPreviewable(onTicketCreated: () -> Unit = {}) {
     }
 }
 
+// Doing the preview for the CreateTicketScreen this way actually allows it to build
 @Preview(showBackground = true)
 @Composable
 fun PreviewCreateTicketScreen() {

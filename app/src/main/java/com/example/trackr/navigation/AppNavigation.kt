@@ -1,24 +1,22 @@
 package com.example.trackr.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.trackr.feature_auth.AuthViewModel
 import com.example.trackr.feature_auth.ui.ForgotPasswordScreen
 import com.example.trackr.feature_auth.ui.LoginScreen
 import com.example.trackr.feature_auth.ui.RegisterScreen
 import com.example.trackr.feature_splash.SplashScreen
 import com.example.trackr.feature_tickets.CreateTicketScreen
+import com.example.trackr.feature_tickets.TicketDetailScreen
 import com.example.trackr.ui.HomeScreen
 
 @Composable
@@ -41,9 +39,7 @@ private fun NavGraphBuilder.authGraph(navController: NavController) {
             LoginScreen(
                 authViewModel = authViewModel,
                 onLoginSuccess = {
-                    navController.navigate("main_app") {
-                        popUpTo("auth") { inclusive = true }
-                    }
+                    navController.navigate("main_app") { popUpTo("auth") { inclusive = true } }
                 },
                 onNavigateToRegister = { navController.navigate("register") },
                 onNavigateToForgotPassword = { navController.navigate("forgot_password") }
@@ -54,9 +50,7 @@ private fun NavGraphBuilder.authGraph(navController: NavController) {
             RegisterScreen(
                 authViewModel = authViewModel,
                 onRegisterSuccess = {
-                    navController.navigate("main_app") {
-                        popUpTo("auth") { inclusive = true }
-                    }
+                    navController.navigate("main_app") { popUpTo("auth") { inclusive = true } }
                 },
                 onNavigateToLogin = { navController.popBackStack() }
             )
@@ -71,6 +65,19 @@ private fun NavGraphBuilder.authGraph(navController: NavController) {
     }
 }
 
+private fun NavGraphBuilder.splashScreen(navController: NavController) {
+    composable("splash") {
+        SplashScreen(
+            onUserAuthenticated = {
+                navController.navigate("main_app") { popUpTo("splash") { inclusive = true } }
+            },
+            onUserNotAuthenticated = {
+                navController.navigate("auth") { popUpTo("splash") { inclusive = true } }
+            }
+        )
+    }
+}
+
 private fun NavGraphBuilder.mainGraph(navController: NavController) {
     navigation(startDestination = "home", route = "main_app") {
         composable("home") {
@@ -81,40 +88,32 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
                         popUpTo("main_app") { inclusive = true }
                     }
                 },
-                // This parameter was missing, now it's added.
                 onNavigateToTicketDetail = { ticketId ->
+                    // This is the action that sends the user to the detail screen
                     navController.navigate("ticket_detail/$ticketId")
                 }
             )
         }
         composable("create_ticket") {
             CreateTicketScreen(
-                onTicketCreated = { navController.popBackStack() }
+                onTicketCreated = { navController.popBackStack() },
+                onNavigateBack = { navController.popBackStack() }
             )
         }
-        // This defines the destination for our ticket detail screen
-        composable("ticket_detail/{ticketId}") { backStackEntry ->
+        // This is the new route for the Ticket Detail Screen
+        composable(
+            route = "ticket_detail/{ticketId}",
+            arguments = listOf(navArgument("ticketId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            // We retrieve the ticketId from the route's arguments
             val ticketId = backStackEntry.arguments?.getString("ticketId")
-            Box(modifier = Modifier.padding(16.dp)) {
-                Text("Showing details for Ticket ID: $ticketId")
-            }
-        }
-    }
-}
+            requireNotNull(ticketId) { "Ticket ID is required as an argument" }
 
-private fun NavGraphBuilder.splashScreen(navController: NavController) {
-    composable("splash") {
-        SplashScreen(
-            onUserAuthenticated = {
-                navController.navigate("main_app") {
-                    popUpTo("splash") { inclusive = true }
-                }
-            },
-            onUserNotAuthenticated = {
-                navController.navigate("auth") {
-                    popUpTo("splash") { inclusive = true }
-                }
-            }
-        )
+            // We pass the ticketId and the back navigation action to the screen
+            TicketDetailScreen(
+                ticketId = ticketId,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
     }
 }
