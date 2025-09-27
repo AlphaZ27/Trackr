@@ -1,5 +1,6 @@
 package com.example.trackr.navigation
 
+
 import androidx.compose.runtime.Composable
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -16,7 +17,7 @@ import com.example.trackr.feature_auth.ui.LoginScreen
 import com.example.trackr.feature_auth.ui.RegisterScreen
 import com.example.trackr.feature_splash.SplashScreen
 import com.example.trackr.feature_tickets.CreateTicketScreen
-import com.example.trackr.feature_tickets.TicketDetailScreen
+import com.example.trackr.feature_tickets.UpdateTicketScreen
 import com.example.trackr.ui.HomeScreen
 
 @Composable
@@ -89,7 +90,6 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
                     }
                 },
                 onNavigateToTicketDetail = { ticketId ->
-                    // This is the action that sends the user to the detail screen
                     navController.navigate("ticket_detail/$ticketId")
                 }
             )
@@ -100,20 +100,18 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
                 onNavigateBack = { navController.popBackStack() }
             )
         }
-        // This is the new route for the Ticket Detail Screen
         composable(
             route = "ticket_detail/{ticketId}",
             arguments = listOf(navArgument("ticketId") { type = NavType.StringType })
         ) { backStackEntry ->
-            // We retrieve the ticketId from the route's arguments
             val ticketId = backStackEntry.arguments?.getString("ticketId")
             requireNotNull(ticketId) { "Ticket ID is required as an argument" }
 
-            // We pass the ticketId and the back navigation action to the screen
-            TicketDetailScreen(
+            UpdateTicketScreen(
                 ticketId = ticketId,
                 onNavigateBack = { navController.popBackStack() }
             )
         }
     }
 }
+
