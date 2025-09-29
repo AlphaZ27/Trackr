@@ -19,6 +19,7 @@ import com.example.trackr.feature_splash.SplashScreen
 import com.example.trackr.feature_tickets.CreateTicketScreen
 import com.example.trackr.feature_tickets.TicketDetailScreen
 import com.example.trackr.feature_tickets.UpdateTicketScreen
+import com.example.trackr.feature_kb.KBDetailScreen
 import com.example.trackr.ui.HomeScreen
 
 @Composable
@@ -92,6 +93,9 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
                 },
                 onNavigateToTicketDetail = { ticketId ->
                     navController.navigate("ticket_detail/$ticketId")
+                },
+                onNavigateToArticleDetail = { articleId ->
+                    navController.navigate("kb_detail/$articleId")
                 }
             )
         }
@@ -122,6 +126,17 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
             val ticketId = backStackEntry.arguments?.getString("ticketId") ?: return@composable
             UpdateTicketScreen(
                 ticketId = ticketId,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = "kb_detail/{articleId}",
+            arguments = listOf(navArgument("articleId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val articleId = backStackEntry.arguments?.getString("articleId")
+            requireNotNull(articleId) { "Article ID is required" }
+            KBDetailScreen(
+                articleId = articleId,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

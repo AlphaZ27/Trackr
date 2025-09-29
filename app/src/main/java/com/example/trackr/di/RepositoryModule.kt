@@ -1,8 +1,10 @@
 package com.example.trackr.di
 
 import com.example.trackr.data.repository.AuthRepositoryImpl
+import com.example.trackr.data.repository.KBRepositoryImpl
 import com.example.trackr.domain.repository.AuthRepository
 import com.example.trackr.data.repository.TicketRepositoryImpl
+import com.example.trackr.domain.repository.KBRepository
 import com.example.trackr.domain.repository.TicketRepository
 import dagger.Binds
 import dagger.Module
@@ -21,4 +23,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindTicketRepository(impl: TicketRepositoryImpl): TicketRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindKBRepository(impl: KBRepositoryImpl): KBRepository
 }

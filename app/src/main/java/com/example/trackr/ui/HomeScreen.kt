@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.trackr.feature_auth.AuthViewModel
+import com.example.trackr.feature_kb.KBListScreen
 import com.example.trackr.feature_tickets.TicketsScreen
 
 // This was previously MainScreen inside AppNavigation.kt
@@ -37,7 +38,8 @@ import com.example.trackr.feature_tickets.TicketsScreen
 fun HomeScreen(
     onNavigateToCreateTicket: () -> Unit,
     onLogout: () -> Unit,
-    onNavigateToTicketDetail: (String) -> Unit
+    onNavigateToTicketDetail: (String) -> Unit,
+    onNavigateToArticleDetail: (String) -> Unit
 ) {
     val authViewModel: AuthViewModel = hiltViewModel()
     var selectedItemIndex by remember { mutableIntStateOf(0) }
@@ -88,7 +90,7 @@ fun HomeScreen(
                         onNavigateToTicketDetail(ticketId)
                     }
                 )
-                1 -> Text("Knowledge Base Screen")
+                1 -> KBListScreen(onNavigateToArticle = onNavigateToArticleDetail)
                 2 -> Text("Settings Screen")
             }
         }
