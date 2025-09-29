@@ -1,6 +1,7 @@
 package com.example.trackr.domain.model
 
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.DocumentId
 
 // Enums provide type-safety and make the code much cleaner than using strings.
 enum class TicketStatus {
@@ -12,14 +13,14 @@ enum class Priority {
 }
 
 data class Ticket(
-    val id: String = "", // Firestore document ID
+    // This annotation tells Firestore to automatically populate this field with the document ID
+    @DocumentId  val id: String = "", // Firestore document ID
     val name: String = "",
-    val assigneeId: String? = null,
+    val assignee: String = "",
     val priority: Priority = Priority.Medium,
     val createdDate: Timestamp = Timestamp.now(),
     val description: String = "",
     val department: String = "",
     val status: TicketStatus = TicketStatus.Open,
-    val resolution: String? = null
+    val resolutionDescription: String = ""
 )
-// Add assigneeID, and resolution desc to createTicketScreen

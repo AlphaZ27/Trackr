@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface TicketRepository {
     // We use a Flow here so the UI can update in real-time when tickets change in Firestore
-    fun getOpenTickets(): Flow<List<Ticket>>
+    fun getAllTickets(): Flow<List<Ticket>>
     // Functions for creating tickets
     suspend fun createTicket(ticket: Ticket): Result<Unit>
     // Functions for ticket details

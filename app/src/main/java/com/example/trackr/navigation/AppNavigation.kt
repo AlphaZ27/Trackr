@@ -17,6 +17,7 @@ import com.example.trackr.feature_auth.ui.LoginScreen
 import com.example.trackr.feature_auth.ui.RegisterScreen
 import com.example.trackr.feature_splash.SplashScreen
 import com.example.trackr.feature_tickets.CreateTicketScreen
+import com.example.trackr.feature_tickets.TicketDetailScreen
 import com.example.trackr.feature_tickets.UpdateTicketScreen
 import com.example.trackr.ui.HomeScreen
 
@@ -107,6 +108,18 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
             val ticketId = backStackEntry.arguments?.getString("ticketId")
             requireNotNull(ticketId) { "Ticket ID is required as an argument" }
 
+            TicketDetailScreen(
+                ticketId = ticketId,
+                onNavigateToUpdate = { id -> navController.navigate("updateTicket/$id") },
+                onNavigateBack = { navController.popBackStack() }
+            )
+
+        }
+        composable(
+            route = "updateTicket/{ticketId}",
+            arguments = listOf(navArgument("ticketId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val ticketId = backStackEntry.arguments?.getString("ticketId") ?: return@composable
             UpdateTicketScreen(
                 ticketId = ticketId,
                 onNavigateBack = { navController.popBackStack() }

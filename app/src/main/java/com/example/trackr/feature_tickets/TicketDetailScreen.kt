@@ -3,17 +3,13 @@ package com.example.trackr.feature_tickets
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.trackr.domain.model.Ticket
-import com.example.trackr.domain.model.TicketStatus
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -22,6 +18,7 @@ import java.util.*
 fun TicketDetailScreen(
     ticketId: String,
     ticketViewModel: TicketViewModel = hiltViewModel(),
+    onNavigateToUpdate: (String) -> Unit,
     onNavigateBack: () -> Unit
 ) {
     val ticket by ticketViewModel.selectedTicket.collectAsState()
@@ -61,7 +58,8 @@ fun TicketDetailScreen(
                 onSaveChanges = { updatedTicket ->
                     ticketViewModel.updateTicket(updatedTicket)
                     onNavigateBack()
-                }
+                },
+                onNavigateToUpdate = onNavigateToUpdate
             )
         }
     }
@@ -82,7 +80,8 @@ fun TicketDetailScreen(
 fun TicketDetailContent(
     modifier: Modifier = Modifier,
     ticket: Ticket,
-    onSaveChanges: (Ticket) -> Unit
+    onSaveChanges: (Ticket) -> Unit,
+    onNavigateToUpdate: (String) -> Unit
 ) {
     var currentStatus by remember { mutableStateOf(ticket.status) }
     var currentPriority by remember { mutableStateOf(ticket.priority) }
@@ -103,6 +102,12 @@ fun TicketDetailContent(
         Text("Description", style = MaterialTheme.typography.labelMedium)
         Text(ticket.description, style = MaterialTheme.typography.bodyLarge)
 
+        Text("Assignee", style = MaterialTheme.typography.labelMedium)
+        Text(ticket.assignee, style = MaterialTheme.typography.bodyLarge)
+
+        Text("Resolution", style = MaterialTheme.typography.labelMedium)
+        Text(ticket.resolutionDescription, style = MaterialTheme.typography.bodyLarge)
+
         // The priority editable field
         PriorityDropdown(
             selectedPriority = currentPriority,
@@ -120,15 +125,24 @@ fun TicketDetailContent(
 
         Spacer(modifier = Modifier.weight(1.0f)) // Pushes button to the bottom
 
-        Button(
+        Button( // This button saves the changes to the ticket on this screen and update ticket screen
             onClick = {
-                val updatedTicket = ticket.copy(status = currentStatus)
+                val updatedTicket = ticket.copy(
+                    priority = currentPriority,
+                    status = currentStatus
+                )
                 onSaveChanges(updatedTicket)
             },
             modifier = Modifier.fillMaxWidth(),
-            enabled = currentStatus != ticket.status // Only enable if changes were made
+            enabled = currentStatus != ticket.status || currentPriority != ticket.priority // Only enable if changes were made
         ) {
-            Text("Save Changes")
+            Text("Save Quick Changes")
+        }
+        Button(
+            onClick = { onNavigateToUpdate(ticket.id) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Edit Ticket")
         }
     }
 }

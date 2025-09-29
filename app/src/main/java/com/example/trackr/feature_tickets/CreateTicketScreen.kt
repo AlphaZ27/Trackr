@@ -32,6 +32,8 @@ fun CreateTicketScreen(
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var department by remember { mutableStateOf("") }
+    var assignee by remember { mutableStateOf("") }
+    var resolution by remember { mutableStateOf("") }
     var priority by remember { mutableStateOf(Priority.Medium) }
     var status by remember { mutableStateOf(TicketStatus.Open) }
 
@@ -53,6 +55,8 @@ fun CreateTicketScreen(
                         name = name,
                         description = description,
                         department = department,
+                        assignee = assignee,
+                        resolutionDescription = resolution,
                         priority = priority,
                         status = status
                     )
@@ -86,6 +90,20 @@ fun CreateTicketScreen(
                 onValueChange = { description = it },
                 label = { Text("Description") },
                 modifier = Modifier.fillMaxWidth().height(150.dp)
+            )
+            OutlinedTextField(
+                value = assignee,
+                onValueChange = { assignee = it },
+                label = { Text("Assignee") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = resolution,
+                onValueChange = { resolution = it },
+                label = { Text("Resolution") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
             )
 
             // Priority Dropdown

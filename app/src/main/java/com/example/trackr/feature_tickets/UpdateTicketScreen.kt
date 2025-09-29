@@ -13,10 +13,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.trackr.domain.model.Priority
 import com.example.trackr.domain.model.TicketStatus
-import com.example.trackr.feature_tickets.TicketDetailState
-import com.example.trackr.feature_tickets.TicketViewModel
-//import com.example.trackr.feature_tickets.ui.shared.PriorityDropdown
-//import com.example.trackr.feature_tickets.ui.shared.StatusDropdown
+import com.example.trackr.feature_tickets.ui.shared.StatusDropdown
+import com.example.trackr.feature_tickets.ui.shared.PriorityDropdown
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,8 +48,8 @@ fun UpdateTicketScreen(
             name = ticket.name
             description = ticket.description
             department = ticket.department
-            assignee = ticket.assigneeId ?: ""
-            resolution = ticket.resolution ?: ""
+            assignee = ticket.assignee
+            resolution = ticket.resolutionDescription
             priority = ticket.priority
             status = ticket.status
         }
@@ -64,6 +62,7 @@ fun UpdateTicketScreen(
         }
     }
 
+    // ********** Update Ticket Form **********
     Scaffold(
         topBar = {
             TopAppBar(
@@ -83,16 +82,30 @@ fun UpdateTicketScreen(
         floatingActionButton = {
             Button(
                 onClick = {
-                    val updatedTicket = ticketState!!.copy(
-                        name = name,
-                        description = description,
-                        department = department,
-                        assigneeId = assignee,
-                        resolution = resolution,
-                        priority = priority,
-                        status = status
-                    )
-                    ticketViewModel.updateTicket(updatedTicket)
+                    ticketState?.let {
+                        val updatedTicket = it.copy(
+                            name = name,
+                            description = description,
+                            department = department,
+                            assignee = assignee,
+                            resolutionDescription = resolution,
+                            priority = priority,
+                            status = status
+                        )
+                        ticketViewModel.updateTicket(updatedTicket)
+
+                    }
+                    //This wasn't working
+//                    val updatedTicket = ticketState!!.copy(
+//                        name = name,
+//                        description = description,
+//                        department = department,
+//                        assigneeId = assignee,
+//                        resolution = resolution,
+//                        priority = priority,
+//                        status = status
+//                    )
+//                    ticketViewModel.updateTicket(updatedTicket)
                 },
                 enabled = detailState !is TicketDetailState.Loading
             ) {
@@ -111,17 +124,53 @@ fun UpdateTicketScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name / Title") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = department, onValueChange = { department = it }, label = { Text("Department") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth().height(120.dp))
-                PriorityDropdown(selectedPriority = priority, onPrioritySelected = { priority = it })
-                StatusDropdown(selectedStatus = status, onStatusSelected = { status = it })
-                OutlinedTextField(value = assignee, onValueChange = { assignee = it }, label = { Text("Assignee") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = resolution, onValueChange = { resolution = it }, label = { Text("Resolution") }, modifier = Modifier.fillMaxWidth().height(120.dp))
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name / Title") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = department,
+                    onValueChange = { department = it },
+                    label = { Text("Department") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                )
+                PriorityDropdown(
+                    selectedPriority = priority,
+                    onPrioritySelected = { priority = it }
+                )
+                StatusDropdown(
+                    selectedStatus = status,
+                    onStatusSelected = { status = it }
+                )
+                OutlinedTextField(
+                    value = assignee,
+                    onValueChange = { assignee = it },
+                    label = { Text("Assignee") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = resolution,
+                    onValueChange = { resolution = it },
+                    label = { Text("Resolution") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                )
             }
         }
     }
 
+    // ********** Delete Ticket Dialog **********
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },

@@ -1,4 +1,4 @@
-package com.example.trackr.feature_tickets.ui
+package com.example.trackr.feature_tickets.ui.shared
 
 
 import androidx.compose.foundation.layout.fillMaxWidth
