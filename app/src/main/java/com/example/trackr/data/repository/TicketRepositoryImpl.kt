@@ -3,6 +3,7 @@ package com.example.trackr.data.repository
 import com.example.trackr.domain.model.Ticket
 import com.example.trackr.domain.repository.TicketRepository
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.channels.awaitClose
@@ -82,6 +83,18 @@ class TicketRepositoryImpl @Inject constructor(
     override suspend fun deleteTicket(ticketId: String): Result<Unit> {
         return try {
             firestore.collection("tickets").document(ticketId).delete().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Function to implementation to link an article
+    override suspend fun linkArticleToTicket(ticketId: String, articleId: String): Result<Unit> {
+        return try {
+            firestore.collection("tickets").document(ticketId)
+                .update("linkedArticles", FieldValue.arrayUnion(articleId))
+                .await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

@@ -20,6 +20,7 @@ import com.example.trackr.feature_tickets.CreateTicketScreen
 import com.example.trackr.feature_tickets.TicketDetailScreen
 import com.example.trackr.feature_tickets.UpdateTicketScreen
 import com.example.trackr.feature_kb.KBDetailScreen
+import com.example.trackr.feature_kb.KBEditScreen
 import com.example.trackr.ui.HomeScreen
 
 @Composable
@@ -96,13 +97,19 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
                 },
                 onNavigateToArticleDetail = { articleId ->
                     navController.navigate("kb_detail/$articleId")
+                },
+                onNavigateToCreateArticle = {
+                    navController.navigate("kb_edit") // Note: No ID is passed
                 }
             )
         }
         composable("create_ticket") {
             CreateTicketScreen(
                 onTicketCreated = { navController.popBackStack() },
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToArticle = { articleId ->
+                    navController.navigate("kb_detail/$articleId")
+                }
             )
         }
         composable(
@@ -115,7 +122,10 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
             TicketDetailScreen(
                 ticketId = ticketId,
                 onNavigateToUpdate = { id -> navController.navigate("updateTicket/$id") },
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToArticle = { articleId ->
+                    navController.navigate("kb_detail/$articleId")
+                }
             )
 
         }
@@ -136,6 +146,22 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
             val articleId = backStackEntry.arguments?.getString("articleId")
             requireNotNull(articleId) { "Article ID is required" }
             KBDetailScreen(
+                articleId = articleId,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToEdit = { id ->
+                    navController.navigate("kb_edit?articleId=$id")
+                }
+            )
+        }
+        composable(
+            route = "kb_edit?articleId={articleId}",
+            arguments = listOf(navArgument("articleId") {
+                type = NavType.StringType
+                nullable = true
+            })
+        ) { backStackEntry ->
+            val articleId = backStackEntry.arguments?.getString("articleId")
+            KBEditScreen(
                 articleId = articleId,
                 onNavigateBack = { navController.popBackStack() }
             )

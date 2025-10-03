@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -18,36 +20,50 @@ import com.example.trackr.domain.model.KBArticle
 @Composable
 fun KBListScreen(
     viewModel: KBListViewModel = hiltViewModel(),
+    onNavigateToCreateArticle: () -> Unit,
     onNavigateToArticle: (String) -> Unit
 ) {
     val articles by viewModel.filteredArticles.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = viewModel::onSearchQueryChange,
-            label = { Text("Search articles...") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        )
-
-        if (articles.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(if (searchQuery.isBlank()) "No articles found." else "No articles match your search.")
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(onClick = onNavigateToCreateArticle) {
+                Icon(Icons.Default.Add, contentDescription = "Create New Article")
             }
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(articles, key = { it.id }) { article ->
-                    ArticleCard(article = article, onClick = { onNavigateToArticle(article.id) })
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = viewModel::onSearchQueryChange,
+                label = { Text("Search articles...") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            )
+
+            if (articles.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(if (searchQuery.isBlank()) "No articles found." else "No articles match your search.")
+                }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(articles, key = { it.id }) { article ->
+                        ArticleCard(article = article, onClick = { onNavigateToArticle(article.id) })
+                    }
                 }
             }
         }
     }
+
 }
 
 @Composable
@@ -66,8 +82,11 @@ fun ArticleCard(article: KBArticle, onClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(Modifier.height(8.dp))
+
             Text(article.title, style = MaterialTheme.typography.titleMedium)
+
             Spacer(Modifier.height(4.dp))
+
             Text(
                 text = article.content.take(150) + "...",
                 style = MaterialTheme.typography.bodyMedium,

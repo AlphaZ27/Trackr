@@ -12,4 +12,7 @@ interface TicketRepository {
     suspend fun getTicketById(ticketId: String): Result<Ticket?>
     suspend fun updateTicket(ticket: Ticket): Result<Unit>
     suspend fun deleteTicket(ticketId: String): Result<Unit>
+
+    // Functions for linking articles to tickets
+    suspend fun linkArticleToTicket(ticketId: String, articleId: String): Result<Unit>
 }

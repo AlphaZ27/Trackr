@@ -6,7 +6,10 @@ import com.example.trackr.domain.model.Priority
 import com.example.trackr.domain.model.Ticket
 import com.example.trackr.domain.model.TicketStatus
 import com.example.trackr.domain.repository.TicketRepository
+import com.example.trackr.domain.model.KBArticle
+import com.example.trackr.domain.repository.KBRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -21,26 +24,11 @@ sealed class TicketDetailState {
 
 @HiltViewModel
 class TicketViewModel @Inject constructor(
-    private val ticketRepository: TicketRepository
+    private val ticketRepository: TicketRepository,
+    private val kbRepository: KBRepository
 ) : ViewModel() {
 
-    // For the list of tickets on the home screen
-//    val tickets: StateFlow<List<Ticket>> = ticketRepository.getOpenTickets()
-//        .stateIn(
-//            scope = viewModelScope,
-//            started = SharingStarted.WhileSubscribed(5000),
-//            initialValue = emptyList()
-//        )
-//
-//    // For the ticket detail screen, holds the currently viewed ticket
-//    private val _selectedTicket = MutableStateFlow<Ticket?>(null)
-//    val selectedTicket = _selectedTicket.asStateFlow()
-//
-//    // This new StateFlow will communicate the state of operations to the UI
-//    private val _detailState = MutableStateFlow<TicketDetailState>(TicketDetailState.Idle)
-//    val detailState = _detailState.asStateFlow()
-
-    // Internal state for filters
+    // --- State for Ticket List Filtering ---
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
 
@@ -50,11 +38,9 @@ class TicketViewModel @Inject constructor(
     private val _selectedPriority = MutableStateFlow<Priority?>(null)
     val selectedPriority = _selectedPriority.asStateFlow()
 
-    // This is the original, unfiltered list of tickets from the repository
     private val _tickets = ticketRepository.getAllTickets()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // This is the final, filtered list that the UI will display
     val filteredTickets: StateFlow<List<Ticket>> =
         combine(_tickets, _searchQuery, _selectedStatus, _selectedPriority) { tickets, query, status, priority ->
             tickets.filter { ticket ->
@@ -67,40 +53,55 @@ class TicketViewModel @Inject constructor(
                 }
                 val statusMatch = status == null || ticket.status == status
                 val priorityMatch = priority == null || ticket.priority == priority
-
                 queryMatch && statusMatch && priorityMatch
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
 
-    // Functions for the UI to call to update filters
-    fun onSearchQueryChange(query: String) {
-        _searchQuery.value = query
-    }
+    // --- State for Ticket Detail Screen ---
+    private val _selectedTicket = MutableStateFlow<Ticket?>(null)
+    val selectedTicket = _selectedTicket.asStateFlow()
 
-    fun onStatusSelected(status: TicketStatus?) {
-        _selectedStatus.value = status
-    }
+    private val _detailState = MutableStateFlow<TicketDetailState>(TicketDetailState.Idle)
+    val detailState = _detailState.asStateFlow()
 
-    fun onPrioritySelected(priority: Priority?) {
-        _selectedPriority.value = priority
-    }
+    private val _linkedArticles = MutableStateFlow<List<KBArticle>>(emptyList())
+    val linkedArticles = _linkedArticles.asStateFlow()
+    private var linkedArticlesJob: Job? = null
 
+
+    // --- State for "Link Article" Dialog ---
+    private val _kbSearchQuery = MutableStateFlow("")
+    val kbSearchQuery = _kbSearchQuery.asStateFlow()
+
+    private val _allKbArticles = kbRepository.getAllArticles()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val searchableArticles: StateFlow<List<KBArticle>> =
+        combine(_allKbArticles, _kbSearchQuery) { articles, query ->
+            if (query.isBlank()) articles else articles.filter { it.title.contains(query, ignoreCase = true) }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+
+    // --- Functions ---
+    fun onSearchQueryChange(query: String) { _searchQuery.value = query }
+    fun onStatusSelected(status: TicketStatus?) { _selectedStatus.value = status }
+    fun onPrioritySelected(priority: Priority?) { _selectedPriority.value = priority }
     fun clearFilters() {
         _searchQuery.value = ""
         _selectedStatus.value = null
         _selectedPriority.value = null
     }
 
+    fun onKbSearchQueryChange(query: String) {
+        _kbSearchQuery.value = query
+    }
 
-    // ************* For the list of tickets on the home screen
-
-    // For the ticket detail screen, holds the currently viewed ticket
-    private val _selectedTicket = MutableStateFlow<Ticket?>(null)
-    val selectedTicket = _selectedTicket.asStateFlow()
-
-    private val _detailState = MutableStateFlow<TicketDetailState>(TicketDetailState.Idle)
-    val detailState = _detailState.asStateFlow()
+    fun linkArticle(ticketId: String, articleId: String) {
+        viewModelScope.launch {
+            ticketRepository.linkArticleToTicket(ticketId, articleId)
+        }
+    }
 
     fun createTicket(ticket: Ticket) {
         viewModelScope.launch {
@@ -111,15 +112,28 @@ class TicketViewModel @Inject constructor(
     fun getTicketById(ticketId: String) {
         viewModelScope.launch {
             _detailState.value = TicketDetailState.Loading
-            _selectedTicket.value = null // Clear previous ticket to show loading state
-            ticketRepository.getTicketById(ticketId)
-                .onSuccess {
-                    _selectedTicket.value = it
-                    _detailState.value = TicketDetailState.Idle
+            _selectedTicket.value = null
+            linkedArticlesJob?.cancel() // Cancel any previous listeners
+            _linkedArticles.value = emptyList()
+
+            val result = ticketRepository.getTicketById(ticketId)
+
+            if (result.isSuccess) {
+                val ticket = result.getOrNull()
+                _selectedTicket.value = ticket
+                _detailState.value = TicketDetailState.Idle
+
+                val articleIds = ticket?.linkedArticles
+                if (!articleIds.isNullOrEmpty()) {
+                    linkedArticlesJob = launch {
+                        kbRepository.getArticlesByIds(articleIds).collect { articles ->
+                            _linkedArticles.value = articles
+                        }
+                    }
                 }
-                .onFailure {
-                    _detailState.value = TicketDetailState.Error(it.message ?: "Failed to load ticket")
-                }
+            } else {
+                _detailState.value = TicketDetailState.Error(result.exceptionOrNull()?.message ?: "Failed to load ticket")
+            }
         }
     }
 
@@ -127,12 +141,8 @@ class TicketViewModel @Inject constructor(
         viewModelScope.launch {
             _detailState.value = TicketDetailState.Loading
             ticketRepository.updateTicket(ticket)
-                .onSuccess {
-                    _detailState.value = TicketDetailState.Success
-                }
-                .onFailure {
-                    _detailState.value = TicketDetailState.Error(it.message ?: "Failed to update ticket")
-                }
+                .onSuccess { _detailState.value = TicketDetailState.Success }
+                .onFailure { _detailState.value = TicketDetailState.Error(it.message ?: "Failed to update ticket") }
         }
     }
 
@@ -140,12 +150,8 @@ class TicketViewModel @Inject constructor(
         viewModelScope.launch {
             _detailState.value = TicketDetailState.Loading
             ticketRepository.deleteTicket(ticketId)
-                .onSuccess {
-                    _detailState.value = TicketDetailState.Success
-                }
-                .onFailure {
-                    _detailState.value = TicketDetailState.Error(it.message ?: "Failed to delete ticket")
-                }
+                .onSuccess { _detailState.value = TicketDetailState.Success }
+                .onFailure { _detailState.value = TicketDetailState.Error(it.message ?: "Failed to delete ticket") }
         }
     }
 }

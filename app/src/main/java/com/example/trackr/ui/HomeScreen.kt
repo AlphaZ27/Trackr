@@ -39,7 +39,8 @@ fun HomeScreen(
     onNavigateToCreateTicket: () -> Unit,
     onLogout: () -> Unit,
     onNavigateToTicketDetail: (String) -> Unit,
-    onNavigateToArticleDetail: (String) -> Unit
+    onNavigateToArticleDetail: (String) -> Unit,
+    onNavigateToCreateArticle: () -> Unit
 ) {
     val authViewModel: AuthViewModel = hiltViewModel()
     var selectedItemIndex by remember { mutableIntStateOf(0) }
@@ -90,7 +91,10 @@ fun HomeScreen(
                         onNavigateToTicketDetail(ticketId)
                     }
                 )
-                1 -> KBListScreen(onNavigateToArticle = onNavigateToArticleDetail)
+                1 -> KBListScreen(
+                    onNavigateToArticle = onNavigateToArticleDetail,
+                    onNavigateToCreateArticle = onNavigateToCreateArticle
+                )
                 2 -> Text("Settings Screen")
             }
         }

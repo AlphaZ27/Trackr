@@ -1,17 +1,28 @@
 package com.example.trackr.feature_tickets
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.trackr.domain.model.Ticket
 import java.text.SimpleDateFormat
+import com.example.trackr.feature_kb.ArticleCard
+import com.example.trackr.feature_tickets.ui.shared.PriorityDropdown
+import com.example.trackr.feature_tickets.ui.shared.StatusDropdown
 import java.util.*
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -19,10 +30,12 @@ fun TicketDetailScreen(
     ticketId: String,
     ticketViewModel: TicketViewModel = hiltViewModel(),
     onNavigateToUpdate: (String) -> Unit,
+    onNavigateToArticle: (String) -> Unit,
     onNavigateBack: () -> Unit
 ) {
     val ticket by ticketViewModel.selectedTicket.collectAsState()
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showLinkDialog by remember { mutableStateOf(false) }
 
     // Fetch the ticket details when the screen is first launched
     LaunchedEffect(key1 = ticketId) {
@@ -39,6 +52,9 @@ fun TicketDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { onNavigateToUpdate(ticketId) }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit Ticket")
+                    }
                     IconButton(onClick = { showDeleteDialog = true }) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete Ticket")
                     }
@@ -59,7 +75,8 @@ fun TicketDetailScreen(
                     ticketViewModel.updateTicket(updatedTicket)
                     onNavigateBack()
                 },
-                onNavigateToUpdate = onNavigateToUpdate
+                onNavigateToArticle = onNavigateToArticle,
+                onLinkArticleClick = { showLinkDialog = true } // Show the dialog when the link button is clicked
             )
         }
     }
@@ -74,6 +91,18 @@ fun TicketDetailScreen(
             onDismiss = { showDeleteDialog = false }
         )
     }
+
+    // Show the new dialog for linking articles
+    if (showLinkDialog) {
+        LinkArticleDialog(
+            viewModel = ticketViewModel,
+            onDismiss = { showLinkDialog = false },
+            onArticleSelected = { articleId ->
+                ticketViewModel.linkArticle(ticketId, articleId)
+                showLinkDialog = false
+            }
+        )
+    }
 }
 
 @Composable
@@ -81,8 +110,14 @@ fun TicketDetailContent(
     modifier: Modifier = Modifier,
     ticket: Ticket,
     onSaveChanges: (Ticket) -> Unit,
-    onNavigateToUpdate: (String) -> Unit
+    onNavigateToArticle: (String) -> Unit,
+    onLinkArticleClick: () -> Unit // New callback for the button
 ) {
+
+    // Inject the ViewModel to get the linked articles
+    val ticketViewModel: TicketViewModel = hiltViewModel()
+    val linkedArticles by ticketViewModel.linkedArticles.collectAsState()
+
     var currentStatus by remember { mutableStateOf(ticket.status) }
     var currentPriority by remember { mutableStateOf(ticket.priority) }
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy, hh:mm a", Locale.getDefault()) }
@@ -90,7 +125,8 @@ fun TicketDetailContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) { // Have to add assignee and resolution
         Text("Title", style = MaterialTheme.typography.labelMedium)
@@ -108,14 +144,36 @@ fun TicketDetailContent(
         Text("Resolution", style = MaterialTheme.typography.labelMedium)
         Text(ticket.resolutionDescription, style = MaterialTheme.typography.bodyLarge)
 
+        Text("Created Date", style = MaterialTheme.typography.labelMedium)
+        Text(dateFormatter.format(ticket.createdDate.toDate()))
+
+        Spacer(modifier = Modifier.padding(vertical = 8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Linked Articles", style = MaterialTheme.typography.titleMedium)
+            TextButton(onClick = onLinkArticleClick) {
+                Text("Link Article")
+            }
+        }
+        if (linkedArticles.isEmpty()) {
+            Text("No articles linked yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                linkedArticles.forEach { article ->
+                    ArticleCard(article = article, onClick = { onNavigateToArticle(article.id) })
+                }
+            }
+        }
+        Spacer(modifier = Modifier.padding(vertical = 8.dp))
+
         // The priority editable field
         PriorityDropdown(
             selectedPriority = currentPriority,
             onPrioritySelected = { currentPriority = it }
         )
-
-        Text("Created Date", style = MaterialTheme.typography.labelMedium)
-        Text(dateFormatter.format(ticket.createdDate.toDate()))
 
         // The status editable field
         StatusDropdown(
@@ -138,14 +196,71 @@ fun TicketDetailContent(
         ) {
             Text("Save Quick Changes")
         }
-        Button(
-            onClick = { onNavigateToUpdate(ticket.id) },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Edit Ticket")
-        }
     }
+
+    // Linked Articles Section
+//    Spacer(modifier = Modifier.padding(vertical = 8.dp))
+//    Row(
+//        modifier = Modifier.fillMaxWidth(),
+//        horizontalArrangement = Arrangement.SpaceBetween,
+//        verticalAlignment = Alignment.CenterVertically
+//    ) {
+//        Text("Linked Articles", style = MaterialTheme.typography.titleMedium)
+//        TextButton(onClick = onLinkArticleClick) {
+//            Text("Link Article")
+//        }
+//    }
+//    if (linkedArticles.isEmpty()) {
+//        Text("No articles linked yet.", style = MaterialTheme.typography.bodySmall)
+//    } else {
+//        linkedArticles.forEach { article ->
+//            ArticleCard(article = article, onClick = { /* TODO: Navigate to article */ })
+//            Spacer(modifier = Modifier.height(8.dp))
+//        }
+//    }
+//    Spacer(modifier = Modifier.padding(vertical = 8.dp))
 }
+
+@Composable
+private fun LinkArticleDialog(
+    viewModel: TicketViewModel,
+    onDismiss: () -> Unit,
+    onArticleSelected: (String) -> Unit
+) {
+    val articles by viewModel.searchableArticles.collectAsState()
+    val searchQuery by viewModel.kbSearchQuery.collectAsState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Link Knowledge Base Article") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = viewModel::onKbSearchQueryChange,
+                    label = { Text("Search articles...") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(articles, key = { it.id }) { article ->
+                        Text(
+                            text = article.title,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onArticleSelected(article.id) }
+                                .padding(vertical = 8.dp)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
 
 @Composable
 fun DeleteConfirmationDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
