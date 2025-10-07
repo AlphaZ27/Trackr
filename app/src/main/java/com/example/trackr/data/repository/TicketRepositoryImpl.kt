@@ -45,33 +45,31 @@ class TicketRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getTicketById(ticketId: String): Result<Ticket?> {
-        return try {
-            val document = firestore.collection("tickets").document(ticketId).get().await()
-            val ticket = document.toObject(Ticket::class.java)?.copy(id = document.id)
-            Result.success(ticket)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    override fun getTicketById(ticketId: String): Flow<Ticket?> = callbackFlow {
+        val listener = firestore.collection("tickets").document(ticketId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val ticket = snapshot?.toObject(Ticket::class.java)
+                trySend(ticket).isSuccess
+            }
+        awaitClose { listener.remove() }
     }
 
     override suspend fun updateTicket(ticket: Ticket): Result<Unit> {
         return try {
-            // Create a map of the fields that can be changed on the detail screen.
-            // This is more efficient and explicit than merging the whole object.
-//            val ticketUpdates = mapOf(
-//                "status" to ticket.status.name,
-//                "priority" to ticket.priority.name,
-//                "description" to ticket.description,
-//                "assignee" to ticket.assignee,
-//                "resolutionDescription" to ticket.resolutionDescription
-//            )
-
-            // This prevents the updateTicket function
-//            firestore.collection("tickets").document(ticket.id)
-//                .set(ticket, SetOptions.merge()).await()
-
             // This merges the updateTicket function and will update all fields from the ticket object passed to it.
+            firestore.collection("tickets").document(ticket.id)
+                .set(ticket, SetOptions.merge()).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    override suspend fun saveTicket(ticket: Ticket): Result<Unit> {
+        return try {
             firestore.collection("tickets").document(ticket.id)
                 .set(ticket, SetOptions.merge()).await()
             Result.success(Unit)
@@ -89,11 +87,23 @@ class TicketRepositoryImpl @Inject constructor(
         }
     }
 
-    // Function to implementation to link an article
+    // Function implementation to link an article
     override suspend fun linkArticleToTicket(ticketId: String, articleId: String): Result<Unit> {
         return try {
             firestore.collection("tickets").document(ticketId)
                 .update("linkedArticles", FieldValue.arrayUnion(articleId))
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Function implementation to unlink an article
+    override suspend fun unlinkArticleFromTicket(ticketId: String, articleId: String): Result<Unit> {
+        return try {
+            firestore.collection("tickets").document(ticketId)
+                .update("linkedArticles", FieldValue.arrayRemove(articleId))
                 .await()
             Result.success(Unit)
         } catch (e: Exception) {

@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
@@ -26,29 +27,34 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
 import com.example.trackr.feature_auth.AuthViewModel
 import com.example.trackr.feature_kb.KBListScreen
 import com.example.trackr.feature_tickets.TicketsScreen
+import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.currentBackStackEntryAsState
 
 // This was previously MainScreen inside AppNavigation.kt
 // It's good practice to move large composables to their own files.
 @OptIn(ExperimentalMaterial3Api::class)
-@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
+//@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun HomeScreen(
-    onNavigateToCreateTicket: () -> Unit,
+    navController: NavController,
     onLogout: () -> Unit,
-    onNavigateToTicketDetail: (String) -> Unit,
-    onNavigateToArticleDetail: (String) -> Unit,
-    onNavigateToCreateArticle: () -> Unit
+    content: @Composable (Modifier) -> Unit
 ) {
     val authViewModel: AuthViewModel = hiltViewModel()
-    var selectedItemIndex by remember { mutableIntStateOf(0) }
     val navItems = listOf(
-        BottomNavItem("Tickets", Icons.Default.Home),
-        BottomNavItem("Knowledge Base", Icons.Default.Info),
-        BottomNavItem("Settings", Icons.Default.Settings)
+        BottomNavItem("Tickets", Icons.Default.Home, "tickets_route"),
+        BottomNavItem("Knowledge Base", Icons.Default.Info, "kb_route"),
+        BottomNavItem("Settings", Icons.Default.Settings, "settings_route")
     )
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
 
     Scaffold(
         topBar = {
@@ -59,24 +65,33 @@ fun HomeScreen(
                         authViewModel.logoutUser()
                         onLogout()
                     }) {
-                        Icon(Icons.Default.Logout, contentDescription = "Logout")
+                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Logout")
                     }
                 }
             )
         },
         floatingActionButton = {
-            if (selectedItemIndex == 0) { // Only show FAB on tickets screen
-                FloatingActionButton(onClick = onNavigateToCreateTicket) {
+            // Only show FAB on the tickets screen
+            if (currentDestination?.route == "tickets_route") {
+                FloatingActionButton(onClick = { navController.navigate("create_ticket") }) {
                     Icon(Icons.Default.Add, contentDescription = "Create Ticket")
                 }
             }
         },
         bottomBar = {
             NavigationBar {
-                navItems.forEachIndexed { index, item ->
+                navItems.forEach { item ->
                     NavigationBarItem(
-                        selected = selectedItemIndex == index,
-                        onClick = { selectedItemIndex = index },
+                        selected = currentDestination?.hierarchy?.any { it.route == item.route } == true,
+                        onClick = {
+                            navController.navigate(item.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
                         label = { Text(item.label) },
                         icon = { Icon(item.icon, contentDescription = item.label) }
                     )
@@ -84,21 +99,9 @@ fun HomeScreen(
             }
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues)) {
-            when (selectedItemIndex) {
-                0 -> TicketsScreen(
-                    onTicketClick = { ticketId ->
-                        onNavigateToTicketDetail(ticketId)
-                    }
-                )
-                1 -> KBListScreen(
-                    onNavigateToArticle = onNavigateToArticleDetail,
-                    onNavigateToCreateArticle = onNavigateToCreateArticle
-                )
-                2 -> Text("Settings Screen")
-            }
-        }
+        // The content from AppNavigation is rendered here with the correct padding.
+        content(Modifier.padding(paddingValues))
     }
 }
 
-private data class BottomNavItem(val label: String, val icon: ImageVector)
+private data class BottomNavItem(val label: String, val icon: ImageVector, val route: String)

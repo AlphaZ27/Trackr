@@ -20,6 +20,7 @@ import com.example.trackr.domain.model.KBArticle
 @Composable
 fun KBListScreen(
     viewModel: KBListViewModel = hiltViewModel(),
+    modifier: Modifier = Modifier,
     onNavigateToCreateArticle: () -> Unit,
     onNavigateToArticle: (String) -> Unit
 ) {
@@ -34,7 +35,7 @@ fun KBListScreen(
         }
     ) { paddingValues ->
         Column(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {

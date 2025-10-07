@@ -3,6 +3,7 @@ package com.example.trackr.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
@@ -21,6 +22,9 @@ import com.example.trackr.feature_tickets.TicketDetailScreen
 import com.example.trackr.feature_tickets.UpdateTicketScreen
 import com.example.trackr.feature_kb.KBDetailScreen
 import com.example.trackr.feature_kb.KBEditScreen
+import com.example.trackr.feature_kb.KBListScreen
+import com.example.trackr.feature_settings.ui.SettingsScreen
+import com.example.trackr.feature_tickets.TicketsScreen
 import com.example.trackr.ui.HomeScreen
 
 @Composable
@@ -83,26 +87,44 @@ private fun NavGraphBuilder.splashScreen(navController: NavController) {
 }
 
 private fun NavGraphBuilder.mainGraph(navController: NavController) {
-    navigation(startDestination = "home", route = "main_app") {
-        composable("home") {
+    // MainGraph uses HomeScreen as a shell for the tabs.
+    navigation(startDestination = "tickets_route", route = "main_app") {
+
+        composable("tickets_route") {
             HomeScreen(
-                onNavigateToCreateTicket = { navController.navigate("create_ticket") },
-                onLogout = {
-                    navController.navigate("auth") {
-                        popUpTo("main_app") { inclusive = true }
-                    }
-                },
-                onNavigateToTicketDetail = { ticketId ->
-                    navController.navigate("ticket_detail/$ticketId")
-                },
-                onNavigateToArticleDetail = { articleId ->
-                    navController.navigate("kb_detail/$articleId")
-                },
-                onNavigateToCreateArticle = {
-                    navController.navigate("kb_edit") // Note: No ID is passed
-                }
-            )
+                navController = navController,
+                onLogout = { navController.navigate("auth") { popUpTo("main_app") { inclusive = true } } }
+            ) { modifier ->
+                TicketsScreen(
+                    modifier = modifier,
+                    onTicketClick = { ticketId -> navController.navigate("ticket_detail/$ticketId") }
+                )
+            }
         }
+
+        composable("kb_route") {
+            HomeScreen(
+                navController = navController,
+                onLogout = { navController.navigate("auth") { popUpTo("main_app") { inclusive = true } } }
+            ) { modifier ->
+                KBListScreen(
+                    modifier = modifier,
+                    onNavigateToArticle = { articleId -> navController.navigate("kb_detail/$articleId") },
+                    onNavigateToCreateArticle = { navController.navigate("kb_edit") }
+                )
+            }
+        }
+
+        composable("settings_route") {
+            HomeScreen(
+                navController = navController,
+                onLogout = { navController.navigate("auth") { popUpTo("main_app") { inclusive = true } } }
+            ) { modifier ->
+                SettingsScreen(modifier = modifier)
+            }
+        }
+
+        // --- Detail screens that navigate on top of the tabs ---
         composable("create_ticket") {
             CreateTicketScreen(
                 onTicketCreated = { navController.popBackStack() },

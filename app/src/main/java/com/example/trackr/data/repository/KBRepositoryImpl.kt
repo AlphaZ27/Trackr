@@ -126,6 +126,19 @@ class KBRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }
 
+    /**
+     * Saves a specific Knowledge Base article.
+     */
+    override suspend fun saveArticle(articleId: String): Result<Unit> {
+        return try {
+            firestore.collection("articles").document(articleId)
+                .set(articleId, SetOptions.merge()).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     /*
     * Submits feedback for a specific Knowledge Base article.
      */

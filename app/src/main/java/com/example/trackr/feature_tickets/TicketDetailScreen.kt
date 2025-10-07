@@ -1,5 +1,6 @@
 package com.example.trackr.feature_tickets
 
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,14 +9,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.trackr.domain.model.Ticket
 import java.text.SimpleDateFormat
 import com.example.trackr.feature_kb.ArticleCard
@@ -37,12 +42,47 @@ fun TicketDetailScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showLinkDialog by remember { mutableStateOf(false) }
 
+    val detailState by ticketViewModel.detailState.collectAsState()
+
+    // --- UI Feedback Logic ---
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(detailState) {
+        when (val state = detailState) {
+            is TicketDetailState.Success -> {
+                scope.launch {
+                    snackbarHostState.showSnackbar("Success!")
+                }
+                ticketViewModel.resetDetailState()
+                // We only navigate back for major updates/deletes, not for link/unlink
+                if (state !is TicketDetailState.Idle) { // A bit of a trick to not nav on initial load
+                    onNavigateBack() // This is for when you want to pop back on quick save
+                }
+            }
+            is TicketDetailState.Error -> {
+                scope.launch {
+                    snackbarHostState.showSnackbar("Error: ${state.message}")
+                }
+                ticketViewModel.resetDetailState()
+            }
+            else -> {}
+        }
+    }
+
+//    LaunchedEffect(detailState) {
+//        if (detailState is TicketDetailState.Success) {
+//            onNavigateBack()
+//        }
+//    }
+
     // Fetch the ticket details when the screen is first launched
     LaunchedEffect(key1 = ticketId) {
         ticketViewModel.getTicketById(ticketId)
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }, // The snackbar host
         topBar = {
             TopAppBar(
                 title = { Text(text = "Ticket #${ticketId.take(6).uppercase()}") },
@@ -163,7 +203,19 @@ fun TicketDetailContent(
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 linkedArticles.forEach { article ->
-                    ArticleCard(article = article, onClick = { onNavigateToArticle(article.id) })
+                    Box {
+                        ArticleCard(article = article, onClick = { onNavigateToArticle(article.id) })
+                        IconButton(
+                            onClick = { ticketViewModel.unlinkArticle(ticket.id, article.id) },
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Unlink Article",
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -197,28 +249,6 @@ fun TicketDetailContent(
             Text("Save Quick Changes")
         }
     }
-
-    // Linked Articles Section
-//    Spacer(modifier = Modifier.padding(vertical = 8.dp))
-//    Row(
-//        modifier = Modifier.fillMaxWidth(),
-//        horizontalArrangement = Arrangement.SpaceBetween,
-//        verticalAlignment = Alignment.CenterVertically
-//    ) {
-//        Text("Linked Articles", style = MaterialTheme.typography.titleMedium)
-//        TextButton(onClick = onLinkArticleClick) {
-//            Text("Link Article")
-//        }
-//    }
-//    if (linkedArticles.isEmpty()) {
-//        Text("No articles linked yet.", style = MaterialTheme.typography.bodySmall)
-//    } else {
-//        linkedArticles.forEach { article ->
-//            ArticleCard(article = article, onClick = { /* TODO: Navigate to article */ })
-//            Spacer(modifier = Modifier.height(8.dp))
-//        }
-//    }
-//    Spacer(modifier = Modifier.padding(vertical = 8.dp))
 }
 
 @Composable

@@ -55,7 +55,6 @@ fun UpdateTicketScreen(
         }
     }
 
-    // This effect listens for successful updates/deletes to navigate back
     LaunchedEffect(key1 = detailState) {
         if (detailState is TicketDetailState.Success) {
             onNavigateBack()
@@ -93,19 +92,7 @@ fun UpdateTicketScreen(
                             status = status
                         )
                         ticketViewModel.updateTicket(updatedTicket)
-
                     }
-                    //This wasn't working
-//                    val updatedTicket = ticketState!!.copy(
-//                        name = name,
-//                        description = description,
-//                        department = department,
-//                        assigneeId = assignee,
-//                        resolution = resolution,
-//                        priority = priority,
-//                        status = status
-//                    )
-//                    ticketViewModel.updateTicket(updatedTicket)
                 },
                 enabled = detailState !is TicketDetailState.Loading
             ) {

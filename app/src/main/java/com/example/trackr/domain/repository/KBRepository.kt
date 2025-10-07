@@ -43,4 +43,10 @@ interface KBRepository {
      * Submits feedback for a specific Knowledge Base article.
      */
     suspend fun submitFeedback(feedback: Feedback): Result<Unit>
+
+    /**
+     * Saves a specific Knowledge Base article.
+     */
+    suspend fun saveArticle(articleId: String): Result<Unit>
+
 }

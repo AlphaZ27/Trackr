@@ -16,6 +16,14 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+// This sealed class represents the state of the create operation
+sealed class CreateState {
+    object Idle : CreateState()
+    object Loading : CreateState()
+    object Success : CreateState()
+    data class Error(val message: String) : CreateState()
+}
+
 @OptIn(FlowPreview::class)
 @HiltViewModel
 class CreateTicketViewModel @Inject constructor(
@@ -33,6 +41,9 @@ class CreateTicketViewModel @Inject constructor(
 
     private val _suggestedArticles = MutableStateFlow<List<KBArticle>>(emptyList())
     val suggestedArticles = _suggestedArticles.asStateFlow()
+
+    private val _createState = MutableStateFlow<CreateState>(CreateState.Idle)
+    val createState = _createState.asStateFlow()
 
     init {
         // Listen for changes in the description field
@@ -59,8 +70,9 @@ class CreateTicketViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-    fun createTicket(onTicketCreated: () -> Unit) {
+    fun createTicket() {
         viewModelScope.launch {
+            _createState.value = CreateState.Loading
             val newTicket = Ticket(
                 name = name.value,
                 description = description.value,
@@ -70,9 +82,13 @@ class CreateTicketViewModel @Inject constructor(
                 priority = priority.value,
                 status = status.value
             )
-            ticketRepository.createTicket(newTicket).onSuccess {
-                onTicketCreated()
-            }
+            ticketRepository.createTicket(newTicket)
+                .onSuccess { _createState.value = CreateState.Success }
+                .onFailure { _createState.value = CreateState.Error(it.message ?: "Failed to create ticket") }
         }
     }
+
+//    fun resetSaveState() {
+//        _createState.value = false
+//    }
 }

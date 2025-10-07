@@ -8,11 +8,14 @@ interface TicketRepository {
     fun getAllTickets(): Flow<List<Ticket>>
     // Functions for creating tickets
     suspend fun createTicket(ticket: Ticket): Result<Unit>
+
     // Functions for ticket details
-    suspend fun getTicketById(ticketId: String): Result<Ticket?>
+    fun getTicketById(ticketId: String): Flow<Ticket?>
     suspend fun updateTicket(ticket: Ticket): Result<Unit>
     suspend fun deleteTicket(ticketId: String): Result<Unit>
+    suspend fun saveTicket(ticket: Ticket): Result<Unit>
 
     // Functions for linking articles to tickets
     suspend fun linkArticleToTicket(ticketId: String, articleId: String): Result<Unit>
+    suspend fun unlinkArticleFromTicket(ticketId: String, articleId: String): Result<Unit>
 }

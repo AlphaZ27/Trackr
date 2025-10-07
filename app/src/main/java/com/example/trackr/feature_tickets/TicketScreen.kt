@@ -23,6 +23,7 @@ import java.util.*
 @Composable
 fun TicketsScreen(
     ticketViewModel: TicketViewModel = hiltViewModel(),
+    modifier: Modifier = Modifier,
     onTicketClick: (String) -> Unit // Callback to navigate to ticket detail
 ) {
     //val tickets by ticketViewModel.tickets.collectAsState()
@@ -33,7 +34,7 @@ fun TicketsScreen(
     val selectedStatus by ticketViewModel.selectedStatus.collectAsState()
     val selectedPriority by ticketViewModel.selectedPriority.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = modifier.fillMaxSize()) {
         // The new filter section at the top
         FilterSection(
             searchQuery = searchQuery,
