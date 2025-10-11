@@ -9,6 +9,11 @@ interface TicketRepository {
     // Functions for creating tickets
     suspend fun createTicket(ticket: Ticket): Result<Unit>
 
+    // Functions for Dashboards
+    suspend fun getTicketsForCurrentUser(): List<Ticket>
+    suspend fun getTicketsForTeam(teamId: String): List<Ticket>
+
+
     // Functions for ticket details
     fun getTicketById(ticketId: String): Flow<Ticket?>
     suspend fun updateTicket(ticket: Ticket): Result<Unit>

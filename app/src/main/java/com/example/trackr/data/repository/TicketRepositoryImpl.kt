@@ -3,6 +3,7 @@ package com.example.trackr.data.repository
 import com.example.trackr.domain.model.Ticket
 import com.example.trackr.domain.repository.TicketRepository
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
@@ -13,7 +14,8 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 class TicketRepositoryImpl @Inject constructor(
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val auth: FirebaseAuth
 ) : TicketRepository {
 
     override fun getAllTickets(): Flow<List<Ticket>> = callbackFlow {
@@ -34,6 +36,40 @@ class TicketRepositoryImpl @Inject constructor(
 
         // This is called when the flow is cancelled
         awaitClose { subscription.remove() }
+    }
+
+    // Function to get only the current user's tickets
+    override suspend fun getTicketsForCurrentUser(): List<Ticket> {
+        val userId = auth.currentUser?.uid ?: return emptyList() // Return empty if no user is logged in
+        return firestore.collection("tickets")
+            .whereEqualTo("creatorId", userId)
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .get()
+            .await()
+            .toObjects(Ticket::class.java)
+    }
+
+    override suspend fun getTicketsForTeam(teamId: String): List<Ticket> {
+        // Step 1: Find all users who are part of the specified team.
+        val userIdsOnTeam = firestore.collection("users")
+            .whereEqualTo("teamId", teamId)
+            .get()
+            .await()
+            .documents.map { it.id }
+
+        // If no users are on the team, there are no tickets to fetch.
+        if (userIdsOnTeam.isEmpty()) {
+            return emptyList()
+        }
+
+        // Step 2: Fetch all tickets where the 'creatorId' is in our list of team members.
+        // Firestore 'in' queries are limited to 30 items. For larger teams, you'd need a different data model.
+        return firestore.collection("tickets")
+            .whereIn("creatorId", userIdsOnTeam)
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .get()
+            .await()
+            .toObjects(Ticket::class.java)
     }
 
     override suspend fun createTicket(ticket: Ticket): Result<Unit> {

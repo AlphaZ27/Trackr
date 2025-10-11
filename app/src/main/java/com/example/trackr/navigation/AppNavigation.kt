@@ -1,6 +1,11 @@
 package com.example.trackr.navigation
 
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.Modifier
@@ -12,6 +17,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.trackr.feature_admin.AdminDashboardScreen
 import com.example.trackr.feature_auth.AuthViewModel
 import com.example.trackr.feature_auth.ui.ForgotPasswordScreen
 import com.example.trackr.feature_auth.ui.LoginScreen
@@ -23,8 +29,11 @@ import com.example.trackr.feature_tickets.UpdateTicketScreen
 import com.example.trackr.feature_kb.KBDetailScreen
 import com.example.trackr.feature_kb.KBEditScreen
 import com.example.trackr.feature_kb.KBListScreen
+import com.example.trackr.feature_manager.ManagerDashboardScreen
 import com.example.trackr.feature_settings.ui.SettingsScreen
+import com.example.trackr.feature_settings.domain.model.UserType
 import com.example.trackr.feature_tickets.TicketsScreen
+import com.example.trackr.feature_user.UserDashboardScreen
 import com.example.trackr.ui.HomeScreen
 
 @Composable
@@ -46,8 +55,19 @@ private fun NavGraphBuilder.authGraph(navController: NavController) {
             val authViewModel: AuthViewModel = hiltViewModel()
             LoginScreen(
                 authViewModel = authViewModel,
-                onLoginSuccess = {
-                    navController.navigate("main_app") { popUpTo("auth") { inclusive = true } }
+                onLoginSuccess = { userType -> // ❗️ The lambda now receives userType
+                    // ❗️ Use the user's role to navigate to the correct start destination
+                    val startDestination = when (userType) {
+                        UserType.Admin -> "admin_dashboard"
+                        UserType.Manager -> "manager_dashboard"
+                        UserType.User -> "user_dashboard" // Or your main tickets screen
+                    }
+
+                    // Navigate to the main app graph, starting at the correct dashboard
+                    navController.navigate(startDestination) {
+                        // Clear the entire auth back stack
+                        popUpTo("auth") { inclusive = true }
+                    }
                 },
                 onNavigateToRegister = { navController.navigate("register") },
                 onNavigateToForgotPassword = { navController.navigate("forgot_password") }
@@ -120,7 +140,29 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
                 navController = navController,
                 onLogout = { navController.navigate("auth") { popUpTo("main_app") { inclusive = true } } }
             ) { modifier ->
-                SettingsScreen(modifier = modifier)
+                SettingsScreen(modifier = modifier, navController = navController)
+            }
+        }
+
+        // --- Add Placeholder Dashboard Screens ---
+        composable("admin_dashboard") {
+            // You will eventually replace this with a real screen
+            AdminDashboardScreen(navController = navController)
+        }
+        composable("manager_dashboard") {
+            ManagerDashboardScreen(navController = navController)
+        }
+        composable("user_dashboard") {
+            HomeScreen(
+                navController = navController,
+                onLogout = { navController.navigate("auth") { popUpTo("main_app") { inclusive = true } } }
+            ) { modifier ->
+                TicketsScreen(
+                    modifier = modifier,
+                    onTicketClick = { ticketId ->
+                        navController.navigate("ticket_detail/$ticketId")
+                    }
+                )
             }
         }
 

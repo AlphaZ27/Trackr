@@ -9,11 +9,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.trackr.feature_auth.AuthViewModel
 import com.example.trackr.feature_auth.AuthScreenState
+import com.example.trackr.feature_settings.domain.model.UserType
 
 @Composable
 fun LoginScreen(
     authViewModel: AuthViewModel,
-    onLoginSuccess: () -> Unit,
+    onLoginSuccess: (userType: UserType) -> Unit,
     onNavigateToRegister: () -> Unit,
     onNavigateToForgotPassword: () -> Unit
 ) {
@@ -21,9 +22,13 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     val loginState by authViewModel.authState.collectAsState()
 
+    // This LaunchedEffect is now the single source of truth for handling success.
     LaunchedEffect(loginState) {
         if (loginState is AuthScreenState.Success) {
-            onLoginSuccess()
+            // Correctly call the lambda without a named argument
+            onLoginSuccess((loginState as AuthScreenState.Success).userType)
+            // Reset the state to prevent re-triggering on configuration changes
+            authViewModel.resetAuthState()
         }
     }
 
@@ -55,11 +60,16 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
+            // The onClick now calls the simplified ViewModel function
             onClick = { authViewModel.loginUser(email, password) },
             modifier = Modifier.fillMaxWidth(),
             enabled = loginState !is AuthScreenState.Loading
         ) {
-            Text("Login")
+            if (loginState is AuthScreenState.Loading) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
+            } else {
+                Text("Login")
+            }
         }
 
         Row(
@@ -72,11 +82,6 @@ fun LoginScreen(
             TextButton(onClick = onNavigateToRegister) {
                 Text("Register")
             }
-        }
-
-        if (loginState is AuthScreenState.Loading) {
-            Spacer(modifier = Modifier.height(16.dp))
-            CircularProgressIndicator()
         }
 
         if (loginState is AuthScreenState.Error) {
