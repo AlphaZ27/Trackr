@@ -93,6 +93,21 @@ class TicketViewModel @Inject constructor(
             if (query.isBlank()) articles else articles.filter { it.title.contains(query, ignoreCase = true) }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+
+    private val _ticket = MutableStateFlow<List<Ticket>>(emptyList())
+    val tickets: StateFlow<List<Ticket>> = _ticket
+
+    init {
+        loadCurrentUserTickets()
+    }
+
+    fun loadCurrentUserTickets() {
+        viewModelScope.launch {
+            // ❗️ Call the new function
+            _ticket.value = ticketRepository.getTicketsForCurrentUser()
+        }
+    }
+
     // --- Functions ---
     fun onSearchQueryChange(query: String) { _searchQuery.value = query }
     fun onStatusSelected(status: TicketStatus?) { _selectedStatus.value = status }

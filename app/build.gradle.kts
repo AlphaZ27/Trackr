@@ -4,12 +4,14 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     id("com.google.dagger.hilt.android")
     id("com.google.gms.google-services")
-    kotlin("kapt")
+    id("kotlin-kapt")
 }
 
 android {
     namespace = "com.example.trackr"
-    compileSdk = 36
+    compileSdk {
+        version = release(36)
+    }
 
     defaultConfig {
         applicationId = "com.example.trackr"
@@ -22,6 +24,11 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+//        javaCompileOptions {
+//            annotationProcessorOptions {
+//                arguments ["dagger.hilt.android.internal.rootComponentPackage"] = "com.example.trackr.TrackrApp"
+//            }
+//        }
     }
 
     buildTypes {
@@ -56,10 +63,23 @@ android {
 
 dependencies {
 
+    // Simple Light weight charting library
+    implementation("com.github.tehras:charts:0.2.4-alpha")
+
     // Hilt for Dependency Injection
-    implementation("com.google.dagger:hilt-android:2.50")
-    kapt("com.google.dagger:hilt-compiler:2.50")
+    implementation("com.google.dagger:hilt-android:2.55")
+    kapt("com.google.dagger:hilt-compiler:2.55")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+
+    // Work Manager Dependency
+    //implementation(platform("androidx.work:work-bom:2.9.0"))
+    implementation("androidx.work:work-runtime-ktx:2.11.0")
+
+
+    //implementation("org.jetbrains.kotlinx:kotlinx-metadata-jvm:0.9.0")
+    //implementation("androidx.hilt:hilt-work:1.2.0")
+    //kapt("androidx.hilt:hilt-compiler:1.2.0")
+
 
     // Jetpack Compose
     implementation("androidx.core:core-ktx:1.12.0")
@@ -71,14 +91,15 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3:1.4.0")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
+    // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
 
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:32.7.4"))
     implementation(libs.firebase.firestore)
-    implementation("com.google.firebase:firebase-auth-ktx")
-    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx:23.2.1")
+    implementation("com.google.firebase:firebase-firestore-ktx:25.1.4")
 
     // datastore
     implementation("androidx.datastore:datastore-preferences:1.1.7")
@@ -91,8 +112,21 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+
+    //coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation("io.mockk:mockk-android:1.14.6")
+    androidTestImplementation("io.mockk:mockk-android:1.14.6")
+    // Coroutines testing
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    // Hilt Testing
+    testImplementation("com.google.dagger:hilt-android-testing:2.50")
+    kaptTest("com.google.dagger:hilt-compiler:2.50")
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

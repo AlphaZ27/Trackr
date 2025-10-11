@@ -23,5 +23,8 @@ data class Ticket(
     val department: String = "",
     val status: TicketStatus = TicketStatus.Open,
     val resolutionDescription: String = "",
-    val linkedArticles: List<String> = emptyList()  // List is empty by default to avoid nulls/crashes if there are no linked articles in tickets
+    val linkedArticles: List<String> = emptyList(),  // List is empty by default to avoid nulls/crashes if there are no linked articles in tickets
+    val createdBy: String = "",
+    val category: String = "General", // Default to "General" if not specified
+    val closedAt: Timestamp? = null
 )

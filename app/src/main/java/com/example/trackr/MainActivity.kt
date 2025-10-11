@@ -1,5 +1,6 @@
 package com.example.trackr
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,12 +9,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.platform.LocalContext
+import androidx.datastore.preferences.preferencesDataStore
+import com.example.trackr.domain.repository.DataStoreRepository
 import com.example.trackr.feature_settings.domain.repository.SettingsRepository
 import com.example.trackr.navigation.AppNavigation
 import com.example.trackr.ui.HomeScreen
@@ -31,28 +37,33 @@ import javax.inject.Inject
  * It sets up the UI and the navigation.
  */
 
+private val Context.dataStore by preferencesDataStore(name = "settings")
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     @Inject
-    lateinit var settingsRepository: SettingsRepository
+    lateinit var dataStoreRepository: DataStoreRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        //enableEdgeToEdge()
         setContent {
-            val themeMode by settingsRepository.themeMode.collectAsState(initial = "system")
+            val themeMode by dataStoreRepository.getTheme().collectAsState(initial = "light")
 
-            val useDarkTheme = when (themeMode) {
-                    "light" -> false
-                    "dark" -> true
-                    else -> isSystemInDarkTheme()
+            val isDark = when (themeMode) {
+                "dark" -> true
+                "light" -> false
+                else -> isSystemInDarkTheme()
+            }
+
+            TrackrTheme(darkTheme = isDark) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    AppNavigation()
                 }
-
-            TrackrTheme(
-                darkTheme = useDarkTheme
-            ) {
-                AppNavigation()
             }
         }
     }

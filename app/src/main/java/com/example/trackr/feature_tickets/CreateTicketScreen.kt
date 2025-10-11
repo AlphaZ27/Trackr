@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.trackr.feature_kb.ArticleCard
+import com.example.trackr.feature_tickets.ui.shared.CategoryDropdown
 import com.example.trackr.feature_tickets.ui.shared.PriorityDropdown
 import com.example.trackr.feature_tickets.ui.shared.StatusDropdown
 
@@ -80,30 +81,35 @@ fun CreateTicketScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             OutlinedTextField(
+                // Name Field
                 value = viewModel.name.value,
                 onValueChange = { viewModel.name.value = it },
                 label = { Text("Ticket Name / Title") },
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
+                // Department Field
                 value = viewModel.department.value,
                 onValueChange = { viewModel.department.value = it },
                 label = { Text("Department (e.g., IT, HR)") },
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
+                // Description Field
                 value = viewModel.description.value,
                 onValueChange = { viewModel.description.value = it },
                 label = { Text("Description") },
                 modifier = Modifier.fillMaxWidth().height(150.dp)
             )
             OutlinedTextField(
+                // Assignee Field
                 value = viewModel.assignee.value,
                 onValueChange = { viewModel.assignee.value = it },
                 label = { Text("Assignee") },
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
+                // Resolution Field
                 value = viewModel.resolution.value,
                 onValueChange = { viewModel.resolution.value = it },
                 label = { Text("Resolution") },
@@ -120,6 +126,12 @@ fun CreateTicketScreen(
                 }
                 Spacer(modifier = Modifier.padding(vertical = 8.dp))
             }
+
+            // Category Dropdown
+            CategoryDropdown(
+                selectedCategory = viewModel.category.value,
+                onCategorySelected = { viewModel.category.value = it }
+            )
 
             // Priority Dropdown
             PriorityDropdown(

@@ -40,7 +40,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 // This was previously MainScreen inside AppNavigation.kt
 // It's good practice to move large composables to their own files.
 @OptIn(ExperimentalMaterial3Api::class)
-//@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")  //Needed for paddingValues
 @Composable
 fun HomeScreen(
     navController: NavController,
@@ -56,6 +56,10 @@ fun HomeScreen(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
+    val selectedItemIndex = remember(currentDestination) {
+        navItems.indexOfFirst { it.route == currentDestination?.route }.coerceAtLeast(0)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -63,7 +67,16 @@ fun HomeScreen(
                 actions = {
                     IconButton(onClick = {
                         authViewModel.logoutUser()
-                        onLogout()
+                        navController.navigate("auth_route") {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                inclusive = true
+                                // Ensures no state is saved when navigating to the login screen
+                                saveState = false
+                            }
+
+                            // Ensures no state is restored when navigating to the login screen
+                            restoreState = false
+                        }
                     }) {
                         Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Logout")
                     }
@@ -71,10 +84,16 @@ fun HomeScreen(
             )
         },
         floatingActionButton = {
-            // Only show FAB on the tickets screen
-            if (currentDestination?.route == "tickets_route") {
-                FloatingActionButton(onClick = { navController.navigate("create_ticket") }) {
-                    Icon(Icons.Default.Add, contentDescription = "Create Ticket")
+            when (selectedItemIndex) {
+                0 -> { // Tickets Screen
+                    FloatingActionButton(onClick = { navController.navigate("create_ticket") }) {
+                        Icon(Icons.Default.Add, contentDescription = "Create Ticket")
+                    }
+                }
+                1 -> { // KB Screen
+                    FloatingActionButton(onClick = { navController.navigate("kb_edit") }) {
+                        Icon(Icons.Default.Add, contentDescription = "Create Article")
+                    }
                 }
             }
         },

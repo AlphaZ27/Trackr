@@ -8,6 +8,9 @@ import androidx.compose.ui.Modifier
 import com.example.trackr.domain.model.Priority
 import com.example.trackr.domain.model.TicketStatus
 
+// A hardcoded list of categories for the app
+val ticketCategories = listOf("General", "IT", "Hardware", "Software", "HR", "Facilities")
+
 // Helper functions to make the enum names look nice in the UI
 fun Priority.displayName(): String = this.name
 fun TicketStatus.displayName(): String = this.name.replace("([a-z])([A-Z])".toRegex(), "$1 $2")
@@ -102,6 +105,51 @@ fun StatusDropdown(
                         expanded = false
                     },
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                )
+            }
+        }
+    }
+}
+
+// Category dropdown
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CategoryDropdown(
+    selectedCategory: String,
+    onCategorySelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
+    ) {
+        OutlinedTextField(
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            value = selectedCategory,
+            onValueChange = {},
+            enabled = false,
+            label = { Text("Category") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            ticketCategories.forEach { category ->
+                DropdownMenuItem(
+                    text = { Text(category) },
+                    onClick = {
+                        onCategorySelected(category)
+                        expanded = false
+                    }
                 )
             }
         }

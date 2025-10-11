@@ -10,6 +10,7 @@ import com.example.trackr.domain.model.Ticket
 import com.example.trackr.domain.model.TicketStatus
 import com.example.trackr.domain.repository.KBRepository
 import com.example.trackr.domain.repository.TicketRepository
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
@@ -28,7 +29,8 @@ sealed class CreateState {
 @HiltViewModel
 class CreateTicketViewModel @Inject constructor(
     private val ticketRepository: TicketRepository,
-    private val kbRepository: KBRepository
+    private val kbRepository: KBRepository,
+    private val auth: FirebaseAuth
 ) : ViewModel() {
 
     val name = mutableStateOf("")
@@ -38,6 +40,8 @@ class CreateTicketViewModel @Inject constructor(
     val resolution = mutableStateOf("")
     val priority = mutableStateOf(Priority.Medium)
     val status = mutableStateOf(TicketStatus.Open)
+    val category = mutableStateOf("General") // Default value
+
 
     private val _suggestedArticles = MutableStateFlow<List<KBArticle>>(emptyList())
     val suggestedArticles = _suggestedArticles.asStateFlow()
@@ -80,7 +84,9 @@ class CreateTicketViewModel @Inject constructor(
                 assignee = assignee.value,
                 resolutionDescription = resolution.value,
                 priority = priority.value,
-                status = status.value
+                status = status.value,
+                createdBy = auth.currentUser?.uid ?: "unknown",
+                category = category.value
             )
             ticketRepository.createTicket(newTicket)
                 .onSuccess { _createState.value = CreateState.Success }

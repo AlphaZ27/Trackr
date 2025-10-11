@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
@@ -27,39 +28,32 @@ fun KBListScreen(
     val articles by viewModel.filteredArticles.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
 
-    Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(onClick = onNavigateToCreateArticle) {
-                Icon(Icons.Default.Add, contentDescription = "Create New Article")
-            }
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = viewModel::onSearchQueryChange,
-                label = { Text("Search articles...") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            )
+    Column(
+        modifier = modifier // Use the modifier passed from HomeScreen
+            .fillMaxSize()
+        // Padding is now handled by HomeScreen's Scaffold
+    ) {
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = viewModel::onSearchQueryChange,
+            label = { Text("Search articles...") },
+            shape = RoundedCornerShape(25.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        )
 
-            if (articles.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(if (searchQuery.isBlank()) "No articles found." else "No articles match your search.")
-                }
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(articles, key = { it.id }) { article ->
-                        ArticleCard(article = article, onClick = { onNavigateToArticle(article.id) })
-                    }
+        if (articles.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(if (searchQuery.isBlank()) "No articles found." else "No articles match your search.")
+            }
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp), // Added bottom padding
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(articles, key = { it.id }) { article ->
+                    ArticleCard(article = article, onClick = { onNavigateToArticle(article.id) })
                 }
             }
         }
