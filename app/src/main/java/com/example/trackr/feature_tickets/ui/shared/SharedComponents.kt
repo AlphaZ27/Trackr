@@ -3,6 +3,7 @@ package com.example.trackr.feature_tickets.ui.shared
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.*
+import androidx.compose.material3.ExposedDropdownMenuAnchorType.Companion.PrimaryNotEditable
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.example.trackr.domain.model.Priority
@@ -29,11 +30,9 @@ fun PriorityDropdown(
         onExpandedChange = { expanded = !expanded }
     ) {
         OutlinedTextField(
-            modifier = Modifier
-                .menuAnchor()
-                .fillMaxWidth(),
             value = selectedPriority.displayName(),
             onValueChange = {},
+            readOnly = true,
             enabled = false, // Use disabled to make the whole field clickable
             label = { Text("Priority") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -43,7 +42,10 @@ fun PriorityDropdown(
                 disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            ),
+            modifier = Modifier
+                .menuAnchor(PrimaryNotEditable)
+                .fillMaxWidth()
         )
         ExposedDropdownMenu(
             expanded = expanded,
@@ -70,18 +72,16 @@ fun StatusDropdown(
     onStatusSelected: (TicketStatus) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val statuses = TicketStatus.values()
+    val statuses = TicketStatus.entries.toTypedArray()
 
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded }
     ) {
         OutlinedTextField(
-            modifier = Modifier
-                .menuAnchor()
-                .fillMaxWidth(),
             value = selectedStatus.displayName(),
             onValueChange = {},
+            readOnly = true,
             enabled = false,
             label = { Text("Status") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -91,7 +91,10 @@ fun StatusDropdown(
                 disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            ),
+            modifier = Modifier
+                    .menuAnchor(PrimaryNotEditable)
+                .fillMaxWidth()
         )
         ExposedDropdownMenu(
             expanded = expanded,
@@ -125,9 +128,9 @@ fun CategoryDropdown(
         onExpandedChange = { expanded = !expanded }
     ) {
         OutlinedTextField(
-            modifier = Modifier.menuAnchor().fillMaxWidth(),
             value = selectedCategory,
             onValueChange = {},
+            readOnly = true,
             enabled = false,
             label = { Text("Category") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -137,7 +140,8 @@ fun CategoryDropdown(
                 disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            ),
+            modifier = Modifier.menuAnchor(PrimaryNotEditable).fillMaxWidth()
         )
         ExposedDropdownMenu(
             expanded = expanded,

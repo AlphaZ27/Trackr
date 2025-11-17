@@ -3,6 +3,7 @@ package com.example.trackr.domain.repository
 
 import com.example.trackr.domain.model.CategoryStat
 import com.example.trackr.domain.model.DashboardStats
+import com.example.trackr.domain.model.ResolutionTimeStats
 import com.example.trackr.domain.model.User
 import com.example.trackr.domain.model.UserRole
 import com.example.trackr.domain.model.UserRoleStats
@@ -35,6 +36,11 @@ interface DashboardRepository {
      * Gets real-time counts of all tickets, grouped by category.
      */
     fun getTicketCategoryStats(): Flow<List<CategoryStat>>
+
+    /**
+     * Gets real-time counts of all tickets, grouped by resolution time.
+     */
+    fun getTicketResolutionStats(): Flow<ResolutionTimeStats>
 
     /**
      * Updates a specific user's role in Firestore.

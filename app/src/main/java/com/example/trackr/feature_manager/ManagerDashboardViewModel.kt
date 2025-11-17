@@ -2,13 +2,8 @@ package com.example.trackr.feature_manager
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.trackr.domain.model.DashboardStats
-import com.example.trackr.domain.model.ResolvedTicketStats
-import com.example.trackr.domain.model.Ticket
-import com.example.trackr.domain.model.TicketAgingStats
-import com.example.trackr.domain.model.TicketStatus
-import com.example.trackr.domain.model.User
-import com.example.trackr.domain.model.UserActivity
+import com.example.trackr.domain.model.*
+import com.example.trackr.domain.repository.AuthRepository
 import com.example.trackr.domain.repository.DashboardRepository
 import com.example.trackr.domain.repository.TicketRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +15,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ManagerDashboardViewModel @Inject constructor(
     dashboardRepository: DashboardRepository,
-    ticketRepository: TicketRepository
+    ticketRepository: TicketRepository,
+    authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -31,6 +27,14 @@ class ManagerDashboardViewModel @Inject constructor(
 
     // Get the list of ALL tickets
     private val _allTickets = ticketRepository.getAllTicketsForReport()
+
+    // Get the current manager's ID
+    private val _managerId = authRepository.getAuthState().map { it?.uid }
+
+    // This combined flow creates the ID set for the manager + their team
+    private val _teamIds = combine(_users, _managerId) { users, managerId ->
+        (users.map { it.id } + managerId).filterNotNull().toSet()
+    }
 
     // Combine users, tickets, and search query into the "User Activity Report"
     val userActivityReport: StateFlow<List<UserActivity>> =
@@ -65,7 +69,7 @@ class ManagerDashboardViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
-    // A real-time flow of the ticket statistics.
+    // A real-time flow of the ticket statistics. (Total, Open, Closed)
     val stats: StateFlow<DashboardStats> = dashboardRepository.getTicketStats()
         .stateIn(
             scope = viewModelScope,
@@ -88,14 +92,13 @@ class ManagerDashboardViewModel @Inject constructor(
             filteredList.sortedBy { it.name }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // State flow for the Ticket Aging Report
+    // State flow for the Ticket Aging Report (Bar Chart)
     val ticketAgingStats: StateFlow<TicketAgingStats> =
-        combine(_users, _allTickets) { users, tickets ->
-            val userIds = users.map { it.id }.toSet()
+        combine(_teamIds, _allTickets) { teamIds, tickets ->
 
             // Filter tickets to only those open and created by the manager's team
             val openTeamTickets = tickets.filter {
-                it.createdBy in userIds &&
+                it.createdBy in teamIds &&
                         (it.status == TicketStatus.Open || it.status == TicketStatus.InProgress)
             }
 
@@ -120,13 +123,13 @@ class ManagerDashboardViewModel @Inject constructor(
 
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TicketAgingStats())
 
+    // State flow for the Resolved Tickets Report (Line Chart)
     val resolvedTicketStats: StateFlow<ResolvedTicketStats> =
-        combine(_users, _allTickets) { users, tickets ->
-            val userIds = users.map { it.id }.toSet()
+        combine(_teamIds, _allTickets) { teamIds, tickets ->
 
             //  Filter tickets to only those closed and created by the manager's team
             val closedTeamTickets = tickets.filter {
-                it.createdBy in userIds &&
+                it.createdBy in teamIds &&
                         it.status == TicketStatus.Closed &&
                         it.closedAt != null // Ensure the timestamp exists
             }
@@ -148,6 +151,26 @@ class ManagerDashboardViewModel @Inject constructor(
             )
 
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ResolvedTicketStats())
+
+    // State flow for the Open Tickets Report (Pie Chart)
+    val openTicketsByCategoryStats: StateFlow<List<CategoryStat>> =
+        combine(_teamIds, _allTickets) { teamIds, tickets ->
+
+            // 1. Filter for open tickets created by the team
+            val openTeamTickets = tickets.filter {
+                it.createdBy in teamIds &&
+                        (it.status == TicketStatus.Open || it.status == TicketStatus.InProgress)
+            }
+
+            // 2. Group by category and map to CategoryStat
+            openTeamTickets
+                .groupBy { it.category }
+                .map { (category, ticketList) ->
+                    CategoryStat(category = category, count = ticketList.size)
+                }
+                .sortedByDescending { it.count }
+
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query

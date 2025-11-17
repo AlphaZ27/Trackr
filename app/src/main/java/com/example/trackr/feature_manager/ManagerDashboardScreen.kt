@@ -11,7 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +26,8 @@ import com.example.trackr.domain.model.User
 import com.example.trackr.ui.HomeScreen
 import com.example.trackr.ui.charts.ResolvedTicketsLineChart
 import com.example.trackr.ui.charts.TicketAgingBarChart
+import com.example.trackr.domain.model.CategoryStat
+import com.example.trackr.ui.charts.TicketPieChart
 import com.example.trackr.util.ReportGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -35,7 +37,8 @@ import kotlinx.coroutines.withContext
 @Composable
 fun ManagerDashboardScreen(
     navController: NavController,
-    viewModel: ManagerDashboardViewModel = hiltViewModel()
+    viewModel: ManagerDashboardViewModel = hiltViewModel(),
+    modifier: Modifier = Modifier
 ) {
 
     val userActivityList by viewModel.userActivityReport.collectAsState()
@@ -45,112 +48,124 @@ fun ManagerDashboardScreen(
     val resolvedStats by viewModel.resolvedTicketStats.collectAsState() // **NEW**
     val searchQuery by viewModel.searchQuery.collectAsState()
 
+    val openCategoryStats by viewModel.openTicketsByCategoryStats.collectAsState()
+
     // For launching the share intent
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // Create an instance of our generator
     val reportGenerator = remember { ReportGenerator() }
 
-    // The HomeScreen provides the TopBar, BottomBar, and FAB scaffold
-    HomeScreen(
-        navController = navController,
-        onLogout = { navController.navigate("auth") { popUpTo("main_app") { inclusive = true } } }
-    ) { modifier ->
-        LazyColumn(
-            modifier = modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Ticket Count
+    LazyColumn(
+        // Apply modifier here
+        modifier = modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Text(
+                "Ticket Summary",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            TicketStatsSection(stats = stats)
+        }
+
+        if (openCategoryStats.isNotEmpty()) {
             item {
                 Text(
-                    "Ticket Summary",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                TicketStatsSection(stats = stats)
-            }
-            // Bar chart
-            item {
-                Text(
-                    "Open Ticket Aging (Your Team)",
+                    "Open Tickets by Category (Your Team)",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
                 )
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    TicketAgingBarChart(stats = agingStats)
+                    TicketPieChart(categoryStats = openCategoryStats)
                 }
             }
-            // Line chart
-            item {
-                Text(
-                    "Resolved Tickets (Your Team)",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
-                )
-                Card(modifier = Modifier.fillMaxWidth()) {
+        }
+
+        item {
+            Text(
+                "Open Ticket Aging (Your Team)",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+            )
+            Card(modifier = Modifier.fillMaxWidth()) {
+                TicketAgingBarChart(stats = agingStats)
+            }
+        }
+
+        item {
+            Text(
+                "Resolved Tickets (Your Team)",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+            )
+            Card(modifier = Modifier.fillMaxWidth()) {
+                // **CHECK IF DATA EXISTS**:
+                // The chart library crashes if all values are 0.
+                val hasData = resolvedStats.last7Days > 0 ||
+                        resolvedStats.last30Days > 0 ||
+                        resolvedStats.last90Days > 0
+
+                if (hasData) {
                     ResolvedTicketsLineChart(stats = resolvedStats)
-                }
-            }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Standard Users",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    OutlinedButton(
-                        onClick = {
-                            scope.launch {
-                                val uri = withContext(Dispatchers.IO) {
-                                    reportGenerator.generateUserReport(context, users)
-                                }
-                                if (uri != null) {
-                                    shareReport(context, uri)
-                                }
-                            }
-                        },
-                        enabled = users.isNotEmpty()
+                } else {
+                    // Show a placeholder instead of crashing
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Share,
-                            contentDescription = "Share",
-                            modifier = Modifier.size(18.dp)
+                        Text(
+                            "No resolved tickets in the last 90 days.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Share User Report")
                     }
                 }
             }
-            // Add the search bar
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Standard Users",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                // !!REMEMBER!!: The Share button is now a FAB in AppNavigation
+            }
+        }
+
+        item {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = viewModel::onSearchQueryChange,
+                label = { Text("Search users by name or email...") },
+                shape = RoundedCornerShape(15.dp),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        if (userActivityList.isEmpty()) {
             item {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = viewModel::onSearchQueryChange,
-                    label = { Text("Search users by name or email...") },
-                    shape = RoundedCornerShape(15.dp),
-                    modifier = Modifier.fillMaxWidth()
+                Text(
+                    "No users found.",
+                    modifier = Modifier.padding(top = 16.dp)
                 )
             }
-            // Use the filtered list
-            if (users.isEmpty()) {
-                item {
-                    Text(
-                        "No users found.",
-                        modifier = Modifier.padding(top = 16.dp)
-                    )
-                }
-            } else {
-                // User data class in domain uses id and not uid
-                items(userActivityList, key = { it.user.id }) { userActivity ->
-                    UserCard(
-                        user = userActivity.user,
-                        openTickets = userActivity.openTickets,
-                        closedTickets = userActivity.closedTickets
-                    )
-                }
+        } else {
+            items(userActivityList, key = { it.user.id }) { userActivity ->
+                UserCard(
+                    user = userActivity.user,
+                    openTickets = userActivity.openTickets,
+                    closedTickets = userActivity.closedTickets
+                )
             }
         }
     }

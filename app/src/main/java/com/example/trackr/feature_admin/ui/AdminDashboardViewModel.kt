@@ -2,18 +2,15 @@ package com.example.trackr.feature_admin.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.trackr.domain.model.CategoryStat
-import com.example.trackr.domain.model.DashboardStats
-import com.example.trackr.domain.model.User
-import com.example.trackr.domain.model.UserRole
-import com.example.trackr.domain.model.UserRoleStats
-import com.example.trackr.domain.model.UserStatus
+import com.example.trackr.domain.model.*
 import com.example.trackr.domain.repository.DashboardRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.Calendar
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @HiltViewModel
@@ -42,16 +39,6 @@ class AdminDashboardViewModel @Inject constructor(
     // Filtered list that reacts to both search and role filters.
     val filteredUsers: StateFlow<List<User>> =
         combine(users, _searchQuery, _selectedRole) { users, query, role ->
-//            users.filter { user ->
-//                val queryMatch = if (query.isBlank()) {
-//                    true
-//                } else {
-//                    user.name.contains(query, ignoreCase = true) ||
-//                            user.email.contains(query, ignoreCase = true)
-//                }
-//                val roleMatch = role == null || user.role == role
-//                queryMatch && roleMatch
-//            }
             val filteredList = users.filter { user ->
                 val queryMatch = if (query.isBlank()) true else {
                     user.name.contains(query, ignoreCase = true) ||
@@ -88,6 +75,32 @@ class AdminDashboardViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+    // Ticket resolution time stats
+    val resolutionTimeStats: StateFlow<ResolutionTimeStats> = dashboardRepository.getTicketResolutionStats()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ResolutionTimeStats()
+        )
+
+    val userCreationStats: StateFlow<UserCreationStats> = users.map { users ->
+        val now = Calendar.getInstance().timeInMillis
+        val days7 = TimeUnit.DAYS.toMillis(7)
+        val days30 = TimeUnit.DAYS.toMillis(30)
+        val days90 = TimeUnit.DAYS.toMillis(90)
+
+        // We can just filter the list we already have
+        val count7Days = users.count { (now - it.createdAt.toDate().time) <= days7 }
+        val count30Days = users.count { (now - it.createdAt.toDate().time) <= days30 }
+        val count90Days = users.count { (now - it.createdAt.toDate().time) <= days90 }
+
+        UserCreationStats(
+            last7Days = count7Days,
+            last30Days = count30Days,
+            last90Days = count90Days
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserCreationStats())
 
     /* *
     Functions

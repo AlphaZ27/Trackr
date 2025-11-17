@@ -1,14 +1,29 @@
 package com.example.trackr.navigation
 
-
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
@@ -17,9 +32,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.trackr.domain.model.Ticket
 import com.example.trackr.domain.model.UserRole
 import com.example.trackr.domain.repository.AuthRepository
 import com.example.trackr.feature_admin.AdminDashboardScreen
+import com.example.trackr.feature_admin.ui.AdminDashboardViewModel
 import com.example.trackr.feature_auth.AuthViewModel
 import com.example.trackr.feature_auth.ui.ForgotPasswordScreen
 import com.example.trackr.feature_auth.ui.LoginScreen
@@ -32,11 +49,17 @@ import com.example.trackr.feature_kb.KBDetailScreen
 import com.example.trackr.feature_kb.KBEditScreen
 import com.example.trackr.feature_kb.KBListScreen
 import com.example.trackr.feature_manager.ManagerDashboardScreen
+import com.example.trackr.feature_manager.ManagerDashboardViewModel
 import com.example.trackr.feature_settings.ui.SettingsScreen
 import com.example.trackr.feature_settings.domain.model.UserType
+import com.example.trackr.feature_tickets.TicketViewModel
 import com.example.trackr.feature_tickets.TicketsScreen
 import com.example.trackr.feature_user.UserDashboardScreen
 import com.example.trackr.ui.HomeScreen
+import com.example.trackr.util.ReportGenerator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun AppNavigation() {
@@ -120,16 +143,43 @@ private fun NavGraphBuilder.splashScreen(navController: NavController) {
     }
 }
 
+// The Share Report function is now defined here because I want it to be a FAB
+private fun shareReport(context: Context, uri: Uri, subject: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/csv"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        putExtra(Intent.EXTRA_SUBJECT, subject)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share Report"))
+}
+
 private fun NavGraphBuilder.mainGraph(navController: NavController) {
     // MainGraph uses HomeScreen as a shell for the tabs.
     navigation(startDestination = "tickets_route", route = "main_app") {
 
         composable("tickets_route") {
+            // Hoist the ViewModel and state here to control the FAB
+            val ticketViewModel: TicketViewModel = hiltViewModel()
+            val tickets by ticketViewModel.filteredTickets.collectAsState()
+            val context = LocalContext.current
+            val scope = rememberCoroutineScope()
+            val reportGenerator = remember { ReportGenerator() }
+
             HomeScreen(
                 navController = navController,
-                onLogout = { navController.navigate("auth") { popUpTo("main_app") { inclusive = true } } }
+                onLogout = { navController.navigate("auth") { popUpTo("main_app") { inclusive = true } } },
+                floatingActionButton = {
+                    TicketScreenFABs(
+                        tickets = tickets,
+                        reportGenerator = reportGenerator,
+                        context = context,
+                        onNavigateToCreate = { navController.navigate("create_ticket") }
+                    )
+                }
             ) { modifier ->
                 TicketsScreen(
+                    ticketViewModel = ticketViewModel,
                     modifier = modifier,
                     onTicketClick = { ticketId -> navController.navigate("ticket_detail/$ticketId") }
                 )
@@ -139,7 +189,12 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
         composable("kb_route") {
             HomeScreen(
                 navController = navController,
-                onLogout = { navController.navigate("auth") { popUpTo("main_app") { inclusive = true } } }
+                onLogout = { navController.navigate("auth") { popUpTo("main_app") { inclusive = true } } },
+                floatingActionButton = {
+                    FloatingActionButton(onClick = { navController.navigate("kb_edit") }) {
+                        Icon(Icons.Default.Add, contentDescription = "Create Article")
+                    }
+                }
             ) { modifier ->
                 KBListScreen(
                     modifier = modifier,
@@ -152,7 +207,8 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
         composable("settings_route") {
             HomeScreen(
                 navController = navController,
-                onLogout = { navController.navigate("auth") { popUpTo("main_app") { inclusive = true } } }
+                onLogout = { navController.navigate("auth") { popUpTo("main_app") { inclusive = true } } },
+                floatingActionButton = {} // No FAB for settings
             ) { modifier ->
                 SettingsScreen(modifier = modifier, navController = navController)
             }
@@ -160,18 +216,113 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
 
         // --- Dashboard Screens ---
         composable("admin_dashboard") {
-            // You will eventually replace this with a real screen
-            AdminDashboardScreen(navController = navController)
-        }
-        composable("manager_dashboard") {
-            ManagerDashboardScreen(navController = navController)
-        }
-        composable("user_dashboard") {
+            val adminViewModel: AdminDashboardViewModel = hiltViewModel()
+            val users by adminViewModel.filteredUsers.collectAsState()
+            val context = LocalContext.current
+            val scope = rememberCoroutineScope()
+            val reportGenerator = remember { ReportGenerator() }
+
             HomeScreen(
                 navController = navController,
-                onLogout = { navController.navigate("auth") { popUpTo("main_app") { inclusive = true } } }
+                onLogout = { /* ... */ },
+                floatingActionButton = {
+                    // FAB for Admin Screen
+                    FloatingActionButton(
+                        onClick = {
+                            if (users.isNotEmpty()) {
+                                scope.launch {
+                                    val uri = withContext(Dispatchers.IO) {
+                                        reportGenerator.generateUserReport(context, users)
+                                    }
+                                    if (uri != null) {
+                                        shareReport(context, uri, "Admin User Report")
+                                    }
+                                }
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "Share Report")
+                    }
+                }
+            ) { modifier ->
+                AdminDashboardScreen(
+                    viewModel = adminViewModel,
+                    navController = navController,
+                    modifier = modifier
+                )
+            }
+        }
+        /* *
+        *
+        * Manager Dashboard Composable
+        *
+         */
+        composable("manager_dashboard") {
+            val managerViewModel: ManagerDashboardViewModel = hiltViewModel()
+            val users by managerViewModel.userActivityReport.collectAsState()
+            val context = LocalContext.current
+            val scope = rememberCoroutineScope()
+            val reportGenerator = remember { ReportGenerator() }
+
+            HomeScreen(
+                navController = navController,
+                onLogout = { /* ... */ },
+                floatingActionButton = {
+                    // FAB for Manager Screen
+                    FloatingActionButton(
+                        onClick = {
+                            if (users.isNotEmpty()) {
+                                scope.launch {
+                                    val uri = withContext(Dispatchers.IO) {
+                                        reportGenerator.generateUserReport(context, users.map { it.user })
+                                    }
+                                    if (uri != null) {
+                                        shareReport(context, uri, "Manager User Report")
+                                    }
+                                }
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "Share Report")
+                    }
+                }
+            ) { modifier ->
+                ManagerDashboardScreen(
+                    viewModel = managerViewModel,
+                    navController = navController,
+                    modifier = modifier
+                )
+            }
+        }
+
+        /*
+        *
+        * User Dashboard Composable
+        *
+         */
+
+        composable("user_dashboard") {
+            // "User" dashboard is the same as the "Tickets" route
+            val ticketViewModel: TicketViewModel = hiltViewModel()
+            val tickets by ticketViewModel.filteredTickets.collectAsState()
+            val context = LocalContext.current
+            val scope = rememberCoroutineScope()
+            val reportGenerator = remember { ReportGenerator() }
+
+            HomeScreen(
+                navController = navController,
+                onLogout = { /* ... */ },
+                floatingActionButton = {
+                    TicketScreenFABs(
+                        tickets = tickets,
+                        reportGenerator = reportGenerator,
+                        context = context,
+                        onNavigateToCreate = { navController.navigate("create_ticket") }
+                    )
+                }
             ) { modifier ->
                 TicketsScreen(
+                    ticketViewModel = ticketViewModel,
                     modifier = modifier,
                     onTicketClick = { ticketId ->
                         navController.navigate("ticket_detail/$ticketId")
@@ -247,3 +398,44 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
     }
 }
 
+// A new helper composable to hold the two FABs for the ticket screen
+@Composable
+private fun TicketScreenFABs(
+    tickets: List<Ticket>,
+    reportGenerator: ReportGenerator,
+    context: Context,
+    onNavigateToCreate: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+
+    Column(
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Share Report FAB (Small)
+        FloatingActionButton(
+            onClick = {
+                scope.launch {
+                    val uri = withContext(Dispatchers.IO) {
+                        reportGenerator.generateTicketReport(context, tickets)
+                    }
+                    if (uri != null) {
+                        shareReport(context, uri, "Ticket Report")
+                    }
+                }
+            },
+            // Use secondary colors to make it less prominent than the "Add" button
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        ) {
+            Icon(Icons.Default.Share, contentDescription = "Share Report")
+        }
+
+        // Create Ticket FAB (Primary)
+        FloatingActionButton(
+            onClick = onNavigateToCreate
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Create Ticket")
+        }
+    }
+}

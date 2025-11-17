@@ -26,14 +26,17 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.trackr.feature_auth.AuthViewModel
 import com.example.trackr.feature_kb.KBListScreen
 import com.example.trackr.feature_tickets.TicketsScreen
 import androidx.compose.runtime.getValue
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 
@@ -44,7 +47,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 @Composable
 fun HomeScreen(
     navController: NavController,
-    onLogout: () -> Unit,
+    onLogout: () -> Unit, // This is now unused by the TopAppBar
+    floatingActionButton: @Composable () -> Unit = {},
     content: @Composable (Modifier) -> Unit
 ) {
     val authViewModel: AuthViewModel = hiltViewModel()
@@ -67,15 +71,18 @@ fun HomeScreen(
                 actions = {
                     IconButton(onClick = {
                         authViewModel.logoutUser()
-                        navController.navigate("auth_route") {
-                            popUpTo(navController.graph.findStartDestination().id) {
+                        // This logic correctly clears the back stack
+                        // and, crucially, prevents it from saving its state.
+                        navController.navigate("auth") {
+                            // Pop the entire graph from the root
+                            popUpTo(navController.graph.id) {
                                 inclusive = true
-                                // Ensures no state is saved when navigating to the login screen
                                 saveState = false
                             }
-
-                            // Ensures no state is restored when navigating to the login screen
+                            // Do not save the state of the graph we are leaving
                             restoreState = false
+                            // Navigate to the login screen
+                            launchSingleTop = true
                         }
                     }) {
                         Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Logout")
@@ -83,20 +90,21 @@ fun HomeScreen(
                 }
             )
         },
-        floatingActionButton = {
-            when (selectedItemIndex) {
-                0 -> { // Tickets Screen
-                    FloatingActionButton(onClick = { navController.navigate("create_ticket") }) {
-                        Icon(Icons.Default.Add, contentDescription = "Create Ticket")
-                    }
-                }
-                1 -> { // KB Screen
-                    FloatingActionButton(onClick = { navController.navigate("kb_edit") }) {
-                        Icon(Icons.Default.Add, contentDescription = "Create Article")
-                    }
-                }
-            }
-        },
+//        floatingActionButton = {
+//            when (selectedItemIndex) {
+//                0 -> { // Tickets Screen
+//                    FloatingActionButton(onClick = { navController.navigate("create_ticket") }) {
+//                        Icon(Icons.Default.Add, contentDescription = "Create Ticket")
+//                    }
+//                }
+//                1 -> { // KB Screen
+//                    FloatingActionButton(onClick = { navController.navigate("kb_edit") }) {
+//                        Icon(Icons.Default.Add, contentDescription = "Create Article")
+//                    }
+//                }
+//            }
+//        },
+        floatingActionButton = floatingActionButton,
         bottomBar = {
             NavigationBar {
                 navItems.forEach { item ->

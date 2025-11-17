@@ -1,19 +1,15 @@
 package com.example.trackr.data.repository
 
-import com.example.trackr.domain.model.CategoryStat
-import com.example.trackr.domain.model.DashboardStats
-import com.example.trackr.domain.model.Ticket
-import com.example.trackr.domain.model.TicketStatus
-import com.example.trackr.domain.model.User
-import com.example.trackr.domain.model.UserRole
-import com.example.trackr.domain.model.UserRoleStats
-import com.example.trackr.domain.model.UserStatus
+
+import com.example.trackr.domain.model.*
 import com.example.trackr.domain.repository.DashboardRepository
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 class DashboardRepositoryImpl @Inject constructor(
@@ -118,6 +114,51 @@ class DashboardRepositoryImpl @Inject constructor(
                     .sortedByDescending { it.count } // Sort to show biggest slices first
 
                 trySend(stats).isSuccess
+            }
+        awaitClose { listener.remove() }
+    }
+
+    override fun getTicketResolutionStats(): Flow<ResolutionTimeStats> = callbackFlow {
+        val listener = firestore.collection("tickets")
+            // We only care about tickets that are closed
+            .whereEqualTo("status", TicketStatus.Closed.name)
+            // We only care about tickets that have a closedAt timestamp
+            .whereNotEqualTo("closedAt", null)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val tickets = snapshot?.toObjects(Ticket::class.java) ?: emptyList()
+
+                // Calculate the resolution time in milliseconds for each ticket
+                val resolutionTimesInMillis = tickets.mapNotNull { ticket ->
+                    val createdAt = ticket.createdDate.toDate().time
+                    val closedAt = ticket.closedAt?.toDate()?.time
+                    if (closedAt != null) {
+                        closedAt - createdAt
+                    } else {
+                        null
+                    }
+                }
+
+                if (resolutionTimesInMillis.isEmpty()) {
+                    // No data, send default stats
+                    trySend(ResolutionTimeStats()).isSuccess
+                } else {
+                    // Calculate stats in hours
+                    val avgInMillis = resolutionTimesInMillis.average()
+                    val minInMillis = resolutionTimesInMillis.minOrNull()
+                    val maxInMillis = resolutionTimesInMillis.maxOrNull()
+
+                    val toHours = { millis: Double -> millis / (1000 * 60 * 60) }
+
+                    trySend(ResolutionTimeStats(
+                        averageResolutionHours = toHours(avgInMillis),
+                        fastestResolutionHours = minInMillis?.let { toHours(it.toDouble()) },
+                        slowestResolutionHours = maxInMillis?.let { toHours(it.toDouble()) }
+                    )).isSuccess
+                }
             }
         awaitClose { listener.remove() }
     }

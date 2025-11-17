@@ -20,10 +20,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.trackr.domain.model.Priority
 import com.example.trackr.domain.model.Ticket
 import com.example.trackr.domain.model.TicketStatus
+import com.example.trackr.feature_tickets.TicketViewModel
 import com.example.trackr.util.ReportGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -50,124 +51,66 @@ fun TicketsScreen(
     val scope = rememberCoroutineScope()
     val reportGenerator = remember { ReportGenerator() }
 
-    LazyColumn(
-        modifier = modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    "All Tickets",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            val uri = withContext(Dispatchers.IO) {
-                                // Use filteredTickets to call the tickets
-                                reportGenerator.generateTicketReport(context, filteredTickets)
-                            }
-                            if (uri != null) {
-                                shareTicketReport(context, uri)
-                            }
-                        }
-                    },
-                    // Use filteredTickets to call the tickets
-                    enabled = filteredTickets.isNotEmpty()
-                ) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Share Report")
-                }
-            }
-        }
+    Column(modifier = modifier.fillMaxSize()) {
+        // The filter section with dropdowns
+        FilterSection(
+            searchQuery = searchQuery,
+            selectedStatus = selectedStatus,
+            selectedPriority = selectedPriority,
+            onQueryChange = ticketViewModel::onSearchQueryChange,
+            onStatusChange = ticketViewModel::onStatusSelected,
+            onPriorityChange = ticketViewModel::onPrioritySelected,
+            onClearFilters = ticketViewModel::clearFilters
+        )
 
-        // Filter Section
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    // **FIX**: Use ticketViewModel
-                    onValueChange = ticketViewModel::onSearchQueryChange,
-                    label = { Text("Search by name, desc, or ID...") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        modifier = Modifier.weight(1f),
-                        selected = selectedStatus != null,
-                        // Use ticketViewModel
-                        onClick = { ticketViewModel.onStatusSelected(null) },
-                        label = { Text(selectedStatus?.name ?: "All Statuses") },
-                        trailingIcon = if (selectedStatus != null) {
-                            { Icon(Icons.Default.Clear, "Clear") }
-                        } else null
-                    )
-                    FilterChip(
-                        modifier = Modifier.weight(1f),
-                        selected = selectedPriority != null,
-                        // Use ticketViewModel
-                        onClick = { ticketViewModel.onPrioritySelected(null) },
-                        label = { Text(selectedPriority?.name ?: "All Priorities") },
-                        trailingIcon = if (selectedPriority != null) {
-                            { Icon(Icons.Default.Clear, "Clear") }
-                        } else null
-                    )
-                }
-            }
-        }
+        // Row for "Share Report" button
+//        Row(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(horizontal = 16.dp, vertical = 8.dp),
+//            verticalAlignment = Alignment.CenterVertically,
+//            horizontalArrangement = Arrangement.End
+//        ) {
+//            OutlinedButton(
+//                onClick = {
+//                    scope.launch {
+//                        val uri = withContext(Dispatchers.IO) {
+//                            reportGenerator.generateTicketReport(context, filteredTickets)
+//                        }
+//                        if (uri != null) {
+//                            shareTicketReport(context, uri)
+//                        }
+//                    }
+//                },
+//                enabled = filteredTickets.isNotEmpty()
+//            ) {
+//                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+//                Spacer(Modifier.width(8.dp))
+//                Text("Share Report")
+//            }
+//        }
 
-        // Ticket List
+        // The list of tickets
         if (filteredTickets.isEmpty()) {
-            item {
-                Text(
-                    "No tickets found.",
-                    modifier = Modifier.padding(top = 16.dp)
-                )
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(if (searchQuery.isNotBlank() || selectedStatus != null || selectedPriority != null) "No tickets match your filters." else "No open tickets found.")
             }
         } else {
-            items(filteredTickets, key = { it.id }) { ticket ->
-                TicketCard(ticket = ticket, onClick = { onTicketClick(ticket.id) })
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(filteredTickets, key = { it.id }) { ticket ->
+                    // **FIX**: Use TicketCard, not TicketItem
+                    TicketCard(ticket = ticket, onClick = { onTicketClick(ticket.id) })
+                }
             }
         }
     }
-
-//    Column(modifier = modifier.fillMaxSize()) {
-//        // The new filter section at the top
-//        FilterSection(
-//            searchQuery = searchQuery,
-//            selectedStatus = selectedStatus,
-//            selectedPriority = selectedPriority,
-//            onQueryChange = ticketViewModel::onSearchQueryChange,
-//            onStatusChange = ticketViewModel::onStatusSelected,
-//            onPriorityChange = ticketViewModel::onPrioritySelected,
-//            onClearFilters = ticketViewModel::clearFilters
-//        )
-//
-//        // The list of tickets
-//        if (filteredTickets.isEmpty()) {
-//            Box(
-//                modifier = Modifier.fillMaxSize(),
-//                contentAlignment = Alignment.Center
-//            ) {
-//                Text(if (searchQuery.isNotBlank() || selectedStatus != null || selectedPriority != null) "No tickets match your filters." else "No open tickets found.")
-//            }
-//        } else {
-//            LazyColumn(
-//                modifier = Modifier.fillMaxSize(),
-//                contentPadding = PaddingValues(16.dp),
-//                verticalArrangement = Arrangement.spacedBy(12.dp)
-//            ) {
-//                items(filteredTickets, key = { it.id }) { ticket ->
-//                    TicketCard(ticket = ticket, onClick = { onTicketClick(ticket.id) })
-//                }
-//            }
-//        }
-//    }
 }
 
 // Helper function to create and start the share intent
@@ -219,12 +162,19 @@ private fun FilterSection(
                 OutlinedTextField(
                     value = selectedStatus?.name ?: "All Statuses",
                     onValueChange = {},
+                    readOnly = true,
                     enabled = false,
-                    //readOnly = true,
                     label = { Text("Status") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = statusExpanded) },
                     shape = RoundedCornerShape(25.dp),
-                    modifier = Modifier.menuAnchor()
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                    modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                 )
                 ExposedDropdownMenu(
                     expanded = statusExpanded,
@@ -249,19 +199,26 @@ private fun FilterSection(
                 OutlinedTextField(
                     value = selectedPriority?.name ?: "All Priorities",
                     onValueChange = {},
+                    readOnly = true,
                     enabled = false,
-                    //readOnly = true,
                     label = { Text("Priority") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = priorityExpanded) },
                     shape = RoundedCornerShape(25.dp),
-                    modifier = Modifier.menuAnchor()
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                    modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                 )
                 ExposedDropdownMenu(
                     expanded = priorityExpanded,
                     onDismissRequest = { priorityExpanded = false }
                 ) {
                     DropdownMenuItem(text = { Text("All Priorities") }, onClick = { onPriorityChange(null); priorityExpanded = false })
-                    Priority.values().forEach { priority ->
+                    Priority.entries.forEach { priority ->
                         DropdownMenuItem(
                             text = { Text(priority.name) },
                             onClick = { onPriorityChange(priority); priorityExpanded = false }

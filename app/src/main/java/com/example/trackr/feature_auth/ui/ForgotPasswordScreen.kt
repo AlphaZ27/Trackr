@@ -20,7 +20,7 @@ fun ForgotPasswordScreen(
 
     // Can add a success message or navigate away
     LaunchedEffect(authState) {
-        if (authState is AuthScreenState.Success) {
+        if (false) {
             onEmailSent()
         }
     }
@@ -49,7 +49,7 @@ fun ForgotPasswordScreen(
 
         Button(
             onClick = { authViewModel.sendPasswordResetEmail(email, onEmailSent) },
-            enabled = authState !is AuthScreenState.Loading,
+            enabled = true,
             shape = RoundedCornerShape(25.dp),
             modifier = Modifier.fillMaxWidth()
         ) {

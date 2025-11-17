@@ -34,6 +34,10 @@ import com.github.tehras.charts.line.renderer.yaxis.SimpleYAxisDrawer as LineSim
 import com.github.tehras.charts.piechart.PieChart
 import com.github.tehras.charts.piechart.PieChartData
 import com.github.tehras.charts.piechart.renderer.SimpleSliceDrawer
+import com.example.trackr.domain.model.UserCreationStats
+//import com.github.tehras.charts.line.renderer.point.FilledCircularPointDrawer
+//import com.github.tehras.charts.line.renderer.xaxis.SimpleXAxisDrawer as LineSimpleXAxisDrawer
+//import com.github.tehras.charts.line.renderer.yaxis.SimpleYAxisDrawer as LineSimpleYAxisDrawer
 
 
 // Generate a list of colors for the chart
@@ -175,6 +179,39 @@ fun ResolvedTicketsLineChart(stats: ResolvedTicketStats) {
         yAxisDrawer = LineSimpleYAxisDrawer(
             labelTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
             labelValueFormatter = { value -> value.toInt().toString() } // 'value' is the Float
+        )
+    )
+}
+
+@Composable
+fun UserCreationLineChart(stats: UserCreationStats) {
+
+    val lineChartDataList = remember(stats) {
+        listOf(
+            LineChartData(
+                points = listOf(
+                    LineChartData.Point(stats.last90Days.toFloat(), "90 Days"),
+                    LineChartData.Point(stats.last30Days.toFloat(), "30 Days"),
+                    LineChartData.Point(stats.last7Days.toFloat(), "7 Days")
+                ),
+                lineDrawer = SolidLineDrawer(color = chartColors[4]) // Use a different color
+            )
+        )
+    }
+
+    LineChart(
+        linesChartData = lineChartDataList,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp)
+            .padding(16.dp),
+        pointDrawer = FilledCircularPointDrawer(color = chartColors[4]),
+        xAxisDrawer = LineSimpleXAxisDrawer(
+            labelTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        yAxisDrawer = LineSimpleYAxisDrawer(
+            labelTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            labelValueFormatter = { value -> value.toInt().toString() }
         )
     )
 }
