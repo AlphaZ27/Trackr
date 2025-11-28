@@ -2,6 +2,8 @@ package com.example.trackr.feature_tickets
 
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -13,18 +15,20 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.trackr.domain.model.Priority
 import com.example.trackr.domain.model.TicketStatus
-import com.example.trackr.feature_tickets.ui.shared.StatusDropdown
+import com.example.trackr.feature_tickets.ui.shared.AssigneeDropdown
+import com.example.trackr.feature_tickets.ui.shared.CategoryDropdown
 import com.example.trackr.feature_tickets.ui.shared.PriorityDropdown
+import com.example.trackr.feature_tickets.ui.shared.StatusDropdown
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UpdateTicketScreen(
     ticketId: String,
     onNavigateBack: () -> Unit,
-    ticketViewModel: TicketViewModel = hiltViewModel()
+    viewModel: UpdateTicketViewModel = hiltViewModel()
 ) {
-    val ticketState by ticketViewModel.selectedTicket.collectAsState()
-    val detailState by ticketViewModel.detailState.collectAsState()
+    val updateState by viewModel.updateState.collectAsState()
+    val users by viewModel.users.collectAsState()
 
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -38,34 +42,35 @@ fun UpdateTicketScreen(
     var status by remember { mutableStateOf(TicketStatus.Open) }
 
     // This effect runs once to fetch the ticket data
-    LaunchedEffect(key1 = ticketId) {
-        ticketViewModel.getTicketById(ticketId)
-    }
+//    LaunchedEffect(key1 = ticketId) {
+//        viewModel.getTicketById(ticketId)
+//    }
+//
+//    // This effect updates the local state whenever the fetched ticket changes
+//    LaunchedEffect(key1 = ticketState) {
+//        ticketState?.let { ticket ->
+//            name = ticket.name
+//            description = ticket.description
+//            department = ticket.department
+//            assignee = ticket.assignee
+//            resolution = ticket.resolutionDescription
+//            priority = ticket.priority
+//            status = ticket.status
+//        }
+//    }
 
-    // This effect updates the local state whenever the fetched ticket changes
-    LaunchedEffect(key1 = ticketState) {
-        ticketState?.let { ticket ->
-            name = ticket.name
-            description = ticket.description
-            department = ticket.department
-            assignee = ticket.assignee
-            resolution = ticket.resolutionDescription
-            priority = ticket.priority
-            status = ticket.status
-        }
-    }
-
-    LaunchedEffect(key1 = detailState) {
-        if (detailState is TicketDetailState.Success) {
+    LaunchedEffect(key1 = updateState) {
+        if (updateState is UpdateState.Success) {
             onNavigateBack()
         }
+        // You can also add a toast for UpdateState.Error here
     }
 
     // ********** Update Ticket Form **********
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("#${ticketId.take(6).uppercase()}") },
+                title = { Text("Update Ticket") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -80,80 +85,70 @@ fun UpdateTicketScreen(
         },
         floatingActionButton = {
             Button(
-                onClick = {
-                    ticketState?.let {
-                        val updatedTicket = it.copy(
-                            name = name,
-                            description = description,
-                            department = department,
-                            assignee = assignee,
-                            resolutionDescription = resolution,
-                            priority = priority,
-                            status = status
-                        )
-                        ticketViewModel.updateTicket(updatedTicket)
-                    }
-                },
-                enabled = detailState !is TicketDetailState.Loading
+                onClick = { viewModel.updateTicket() },
+                enabled = updateState !is UpdateState.Loading
             ) {
                 Text("Save Changes")
             }
         }
     ) { paddingValues ->
-        if (detailState is TicketDetailState.Loading && ticketState == null) {
+        if (updateState is UpdateState.Loading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-        } else {
-            Column(
+        }
+        Column(
+            modifier = Modifier
+                .padding(paddingValues)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedTextField(
+                value = viewModel.name.value,
+                onValueChange = { viewModel.name.value = it },
+                label = { Text("Name / Title") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = viewModel.department.value,
+                onValueChange = { viewModel.department.value = it },
+                label = { Text("Department") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = viewModel.description.value,
+                onValueChange = { viewModel.description.value = it },
+                label = { Text("Description") },
                 modifier = Modifier
-                    .padding(paddingValues)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Name / Title") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = department,
-                    onValueChange = { department = it },
-                    label = { Text("Department") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Description") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                )
-                PriorityDropdown(
-                    selectedPriority = priority,
-                    onPrioritySelected = { priority = it }
-                )
-                StatusDropdown(
-                    selectedStatus = status,
-                    onStatusSelected = { status = it }
-                )
-                OutlinedTextField(
-                    value = assignee,
-                    onValueChange = { assignee = it },
-                    label = { Text("Assignee") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = resolution,
-                    onValueChange = { resolution = it },
-                    label = { Text("Resolution") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                )
-            }
+                    .fillMaxWidth()
+                    .height(120.dp)
+            )
+            CategoryDropdown(
+                selectedCategory = viewModel.category.value,
+                onCategorySelected = { viewModel.category.value = it }
+            )
+            PriorityDropdown(
+                selectedPriority = viewModel.priority.value,
+                onPrioritySelected = { viewModel.priority.value = it }
+            )
+            StatusDropdown(
+                selectedStatus = viewModel.status.value,
+                onStatusSelected = { viewModel.status.value = it }
+            )
+            AssigneeDropdown(
+                allUsers = users,
+                selectedUser = viewModel.assignee.value,
+                onUserSelected = { viewModel.assignee.value = it }
+            )
+            OutlinedTextField(
+                value = viewModel.resolution.value,
+                onValueChange = { viewModel.resolution.value = it },
+                label = { Text("Resolution") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+            )
         }
     }
 
@@ -162,11 +157,11 @@ fun UpdateTicketScreen(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Delete Ticket?") },
-            text = { Text("Are you sure you want to permanently delete this ticket? This action cannot be undone.") },
+            text = { Text("Are you sure you want to permanently delete this ticket?") },
             confirmButton = {
                 Button(
                     onClick = {
-                        ticketViewModel.deleteTicket(ticketId)
+                        viewModel.deleteTicket()
                         showDeleteDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)

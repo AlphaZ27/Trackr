@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import com.google.firebase.Timestamp
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -26,7 +27,6 @@ class AdminDashboardViewModel @Inject constructor(
     private val _selectedRole = MutableStateFlow<UserRole?>(null)
     val selectedRole = _selectedRole.asStateFlow()
 
-
     // A real-time flow of ALL users.
     val users: StateFlow<List<User>> = dashboardRepository.getAllUsers()
         .stateIn(
@@ -35,11 +35,25 @@ class AdminDashboardViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
+    // A real-time flow of inactive users.
+    val inactiveUsers: StateFlow<List<User>> = users.map { users ->
+        val calendar = Calendar.getInstance()
+        calendar.add(Calendar.DAY_OF_YEAR, -30) // 30 days ago
+        val inactivityThreshold = Timestamp(calendar.time)
+
+        users.filter { user ->
+            // User is inactive if lastLogin is not null AND it is before the threshold
+            user.lastLogin != null && user.lastLogin < inactivityThreshold
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Filtered list that reacts to both search and role filters.
     val filteredUsers: StateFlow<List<User>> =
         combine(users, _searchQuery, _selectedRole) { users, query, role ->
-            val filteredList = users.filter { user ->
+
+            val distinctUsers = users.distinctBy { it.id }
+
+            val filteredList = distinctUsers.filter { user ->
                 val queryMatch = if (query.isBlank()) true else {
                     user.name.contains(query, ignoreCase = true) ||
                             user.email.contains(query, ignoreCase = true)
@@ -48,7 +62,7 @@ class AdminDashboardViewModel @Inject constructor(
                 queryMatch && roleMatch
             }
             // Sort the list here, in the viewmodel
-            filteredList.sortedBy { it.name }
+            filteredList.distinctBy { it.id }.sortedBy { it.name }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
 
@@ -90,10 +104,13 @@ class AdminDashboardViewModel @Inject constructor(
         val days30 = TimeUnit.DAYS.toMillis(30)
         val days90 = TimeUnit.DAYS.toMillis(90)
 
+        val distinctUsers = users.distinctBy { it.id }
+
+
         // We can just filter the list we already have
-        val count7Days = users.count { (now - it.createdAt.toDate().time) <= days7 }
-        val count30Days = users.count { (now - it.createdAt.toDate().time) <= days30 }
-        val count90Days = users.count { (now - it.createdAt.toDate().time) <= days90 }
+        val count7Days = distinctUsers.count { it.createdAt != null && (now - it.createdAt.toDate().time) <= days7 }
+        val count30Days = distinctUsers.count { it.createdAt != null && (now - it.createdAt.toDate().time) <= days30 }
+        val count90Days = distinctUsers.count { it.createdAt != null && (now - it.createdAt.toDate().time) <= days90 }
 
         UserCreationStats(
             last7Days = count7Days,

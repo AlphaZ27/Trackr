@@ -3,6 +3,7 @@ package com.example.trackr.feature_tickets
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.trackr.domain.model.Priority
@@ -244,13 +247,22 @@ fun TicketCard(ticket: Ticket, onClick: () -> Unit) {
         Priority.Urgent -> Color(0xFFF44336) // A nice red
     }
 
+    val statusColor = when (ticket.status) {
+        TicketStatus.Open -> MaterialTheme.colorScheme.primary
+        TicketStatus.InProgress -> Color(0xFFFFA000) // Amber
+        TicketStatus.Closed -> Color(0xFF4CAF50) // Green
+    }
+
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(12.dp), // Softer corners
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) // Subtle border
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Top Row
@@ -264,25 +276,53 @@ fun TicketCard(ticket: Ticket, onClick: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Text(
-                    text = ticket.department.uppercase(),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold
-                )
+//                Text(
+//                    text = ticket.department.uppercase(),
+//                    style = MaterialTheme.typography.bodySmall,
+//                    fontWeight = FontWeight.Bold
+//                )
+                // Small Status Badge
+                Surface(
+                    color = statusColor.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(50),
+                    border = BorderStroke(1.dp, statusColor.copy(alpha = 0.5f))
+                ) {
+                    Text(
+                        text = ticket.status.name,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = statusColor,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
             }
             Spacer(Modifier.height(8.dp))
 
             // Name / Title
-            Text(text = ticket.name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = ticket.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = ticket.department,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
             Spacer(Modifier.height(4.dp))
 
             // Description
             Text(
-                text = ticket.description.take(100) + if (ticket.description.length > 100) "..." else "",
+                text = ticket.description,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
             Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Bottom Row
             Row(
@@ -290,15 +330,25 @@ fun TicketCard(ticket: Ticket, onClick: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = ticket.priority.name,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = priorityColor,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Flag, // Or a circle shape
+                        contentDescription = "Priority",
+                        tint = priorityColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = ticket.priority.name,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = priorityColor,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
                 Text(
                     text = dateFormatter.format(ticket.createdDate.toDate()),
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

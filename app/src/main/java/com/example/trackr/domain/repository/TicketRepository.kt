@@ -26,4 +26,11 @@ interface TicketRepository {
 
     // Functions for ticket reports (for admins) gets all tickets for report
     fun getAllTicketsForReport(): Flow<List<Ticket>>
+
+    // Get recent open tickets for similarity checking
+    fun getRecentOpenTickets(): Flow<List<Ticket>>
+
+    // Functions for ticket groups - Assign a group ID to a list of tickets
+    suspend fun groupTickets(ticketIds: List<String>, groupId: String): Result<Unit>
+
 }

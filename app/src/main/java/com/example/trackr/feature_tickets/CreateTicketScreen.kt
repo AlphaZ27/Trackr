@@ -1,35 +1,28 @@
 package com.example.trackr.feature_tickets
 
 import android.widget.Toast
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.example.trackr.domain.model.Ticket
 import com.example.trackr.feature_kb.ArticleCard
 import com.example.trackr.feature_tickets.ui.shared.CategoryDropdown
 import com.example.trackr.feature_tickets.ui.shared.PriorityDropdown
 import com.example.trackr.feature_tickets.ui.shared.StatusDropdown
+import com.example.trackr.feature_tickets.ui.shared.AssigneeDropdown
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,10 +36,18 @@ fun CreateTicketScreen(
 
     val suggestedArticles by viewModel.suggestedArticles.collectAsState()
     val createState by viewModel.createState.collectAsState()
+    val potentialDuplicates by viewModel.potentialDuplicates.collectAsState()
+    val users by viewModel.users.collectAsState()
+
+    val context = LocalContext.current
 
     // React to save success
     LaunchedEffect(createState) {
         if (createState is CreateState.Success) {
+            Toast.makeText(
+                context,
+                "Ticket created successfully!",
+                Toast.LENGTH_SHORT).show()
             onNavigateBack()
         }
     }
@@ -77,7 +78,7 @@ fun CreateTicketScreen(
         }
     ) { paddingValues ->
         Column(
-            modifier = Modifier.padding(paddingValues).padding(16.dp),
+            modifier = Modifier.padding(paddingValues).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             OutlinedTextField(
@@ -87,6 +88,7 @@ fun CreateTicketScreen(
                 label = { Text("Ticket Name / Title") },
                 modifier = Modifier.fillMaxWidth()
             )
+
             OutlinedTextField(
                 // Department Field
                 value = viewModel.department.value,
@@ -94,6 +96,7 @@ fun CreateTicketScreen(
                 label = { Text("Department (e.g., IT, HR)") },
                 modifier = Modifier.fillMaxWidth()
             )
+
             OutlinedTextField(
                 // Description Field
                 value = viewModel.description.value,
@@ -101,13 +104,40 @@ fun CreateTicketScreen(
                 label = { Text("Description") },
                 modifier = Modifier.fillMaxWidth().height(150.dp)
             )
-            OutlinedTextField(
-                // Assignee Field
-                value = viewModel.assignee.value,
-                onValueChange = { viewModel.assignee.value = it },
-                label = { Text("Assignee") },
-                modifier = Modifier.fillMaxWidth()
+
+            // Potential Duplicates Warning Section
+            if (potentialDuplicates.isNotEmpty()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Potential Duplicates Found!",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        potentialDuplicates.forEach { ticket ->
+                            DuplicateTicketItem(ticket)
+                        }
+                    }
+                }
+            }
+
+            // Assignee Dropdown
+            val users by viewModel.users.collectAsState()
+            AssigneeDropdown(
+                allUsers = users,
+                selectedUser = viewModel.assignee.value,
+                onUserSelected = { viewModel.assignee.value = it }
             )
+
             OutlinedTextField(
                 // Resolution Field
                 value = viewModel.resolution.value,
@@ -124,7 +154,7 @@ fun CreateTicketScreen(
                 suggestedArticles.forEach { article ->
                     ArticleCard(article = article, onClick = { onNavigateToArticle(article.id) })
                 }
-                Spacer(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             }
 
             // Category Dropdown
@@ -148,3 +178,21 @@ fun CreateTicketScreen(
     }
 }
 
+@Composable
+fun DuplicateTicketItem(ticket: Ticket) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .border(1.dp, MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.5f), MaterialTheme.shapes.medium)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(ticket.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "Status: ${ticket.status.name} • Assigned: ${if(ticket.assignee.isEmpty()) "None" else "..."}",
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
+    }
+}

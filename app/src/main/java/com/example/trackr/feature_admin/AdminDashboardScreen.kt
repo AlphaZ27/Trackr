@@ -12,11 +12,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -48,6 +50,7 @@ fun AdminDashboardScreen(
     val categoryStats by viewModel.categoryStats.collectAsState()
     val resolutionStats by viewModel.resolutionTimeStats.collectAsState()
     val userCreationStats by viewModel.userCreationStats.collectAsState() // **NEW**
+    val inactiveUsers by viewModel.inactiveUsers.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedRole by viewModel.selectedRole.collectAsState()
 
@@ -59,10 +62,40 @@ fun AdminDashboardScreen(
     val reportGenerator = remember { ReportGenerator() }
 
     LazyColumn(
-        // Apply modifier here
         modifier = modifier.padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        if (inactiveUsers.isNotEmpty()) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Warning, contentDescription = null)
+                        Spacer(Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                "Inactive Accounts Detected",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "${inactiveUsers.size} users haven't logged in for 30+ days.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         item {
             Text(
                 "System Ticket Summary",
@@ -277,7 +310,9 @@ private fun ResolutionStatsSection(stats: ResolutionTimeStats) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             StatItem(label = "Avg Resolve", value = formatHours(stats.averageResolutionHours))
+            Spacer(modifier = Modifier.width(50.dp))
             StatItem(label = "Fastest", value = formatHours(stats.fastestResolutionHours))
+            Spacer(modifier = Modifier.width(50.dp))
             StatItem(label = "Slowest", value = formatHours(stats.slowestResolutionHours))
         }
     }

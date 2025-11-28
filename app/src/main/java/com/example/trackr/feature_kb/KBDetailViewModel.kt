@@ -56,6 +56,10 @@ class KBDetailViewModel @Inject constructor(
                 .onSuccess {
                     _article.value = it
                     _uiState.value = KBDetailState.Idle
+
+                    // Increment view count immediately upon successful load
+                    launch { kbRepository.incrementViewCount(articleId) }
+
                     // Start listening for feedback for this article
                     feedbackJob = launch {
                         kbRepository.getFeedbackForArticle(articleId).collect { feedback ->

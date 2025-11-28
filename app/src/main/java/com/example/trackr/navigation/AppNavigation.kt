@@ -350,7 +350,9 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
 
             TicketDetailScreen(
                 ticketId = ticketId,
-                onNavigateToUpdate = { id -> navController.navigate("updateTicket/$id") },
+                onNavigateToEdit = { ticketId ->
+                    navController.navigate("update_ticket/$ticketId")
+                },
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToArticle = { articleId ->
                     navController.navigate("kb_detail/$articleId")
@@ -359,7 +361,7 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
 
         }
         composable(
-            route = "updateTicket/{ticketId}",
+            route = "update_Ticket/{ticketId}",
             arguments = listOf(navArgument("ticketId") { type = NavType.StringType })
         ) { backStackEntry ->
             val ticketId = backStackEntry.arguments?.getString("ticketId") ?: return@composable

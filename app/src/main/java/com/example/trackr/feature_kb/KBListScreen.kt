@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.trackr.domain.model.KBArticle
@@ -25,14 +26,29 @@ fun KBListScreen(
     onNavigateToCreateArticle: () -> Unit,
     onNavigateToArticle: (String) -> Unit
 ) {
-    val articles by viewModel.filteredArticles.collectAsState()
+    val articles by viewModel.displayedArticles.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val selectedTab by viewModel.selectedTab.collectAsState()
+
 
     Column(
         modifier = modifier // Use the modifier passed from HomeScreen
             .fillMaxSize()
         // Padding is now handled by HomeScreen's Scaffold
     ) {
+        PrimaryTabRow(selectedTabIndex = selectedTab) {
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { viewModel.onTabSelected(0) },
+                text = { Text("All Articles") }
+            )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { viewModel.onTabSelected(1) },
+                text = { Text("Frequent Issues") }
+            )
+        }
+
         OutlinedTextField(
             value = searchQuery,
             onValueChange = viewModel::onSearchQueryChange,
@@ -70,22 +86,42 @@ fun ArticleCard(article: KBArticle, onClick: () -> Unit) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = article.category.uppercase(),
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = article.category.uppercase(),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                // Shows the view count
+                Text(
+                    text = "${article.viewCount} views",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             Spacer(Modifier.height(8.dp))
 
-            Text(article.title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                article.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
 
             Spacer(Modifier.height(4.dp))
 
             Text(
                 text = article.content.take(150) + "...",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

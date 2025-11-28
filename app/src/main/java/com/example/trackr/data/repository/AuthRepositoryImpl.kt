@@ -5,6 +5,7 @@ import com.example.trackr.domain.model.UserRole
 import com.example.trackr.domain.model.UserStatus
 import com.google.firebase.auth.AuthResult
 import com.example.trackr.domain.repository.AuthRepository
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.auth.FirebaseUser
@@ -27,6 +28,15 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun login(email: String, password: String): Result<AuthResult> {
         return try {
             val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
+            try {
+                result.user?.uid?.let { uid ->
+                    firestore.collection("users").document(uid)
+                        .update("lastLogin", Timestamp.now()).await()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
             Result.success(result)
         } catch (e: Exception) {
             Result.failure(e)
@@ -43,7 +53,9 @@ class AuthRepositoryImpl @Inject constructor(
                 name = name,
                 email = email,
                 role = UserRole.User, // Default new users to the 'User' role
-                status = UserStatus.Active
+                status = UserStatus.Active,
+                createdAt = Timestamp.now(),
+                lastLogin = Timestamp.now()
             )
             firestore.collection("users").document(user.id).set(user).await()
             Result.success(result)

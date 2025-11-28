@@ -10,6 +10,7 @@ data class User(
     val email: String = "",
     val role: UserRole = UserRole.User, // "admin", "manager", "user"
     val status: UserStatus = UserStatus.Active, // "active", "inactive"
-    val createdAt: Timestamp = Timestamp.now()
+    val createdAt: Timestamp? = null,
+    val lastLogin: Timestamp? = null
 
 )

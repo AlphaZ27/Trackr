@@ -1,12 +1,13 @@
 package com.example.trackr.feature_tickets
 
+import android.util.Log
+import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.trackr.domain.model.Priority
-import com.example.trackr.domain.model.Ticket
-import com.example.trackr.domain.model.TicketStatus
+import com.example.trackr.domain.logic.GroupingEngine
 import com.example.trackr.domain.repository.TicketRepository
-import com.example.trackr.domain.model.KBArticle
+import com.example.trackr.domain.model.*
 import com.example.trackr.domain.repository.KBRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,7 +20,7 @@ import javax.inject.Inject
 sealed class TicketDetailState {
     object Idle : TicketDetailState()
     object Loading : TicketDetailState()
-    object Success : TicketDetailState()
+    object Success : TicketDetailState() // For update, delete, and link operations
     data class Error(val message: String) : TicketDetailState()
 }
 
@@ -27,7 +28,8 @@ sealed class TicketDetailState {
 @HiltViewModel
 class TicketViewModel @Inject constructor(
     private val ticketRepository: TicketRepository,
-    private val kbRepository: KBRepository
+    private val kbRepository: KBRepository,
+    private val groupingEngine: GroupingEngine
 ) : ViewModel() {
 
     // --- State for Ticket List Filtering ---
@@ -39,6 +41,11 @@ class TicketViewModel @Inject constructor(
     val selectedPriority = _selectedPriority.asStateFlow()
     private val _tickets = ticketRepository.getAllTickets()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Toggle for Group View
+    private val _isGroupView = MutableStateFlow(false)
+    val isGroupView = _isGroupView.asStateFlow()
+
     val filteredTickets: StateFlow<List<Ticket>> =
         combine(_tickets, _searchQuery, _selectedStatus, _selectedPriority) { tickets, query, status, priority ->
             tickets.filter { ticket ->
@@ -52,6 +59,16 @@ class TicketViewModel @Inject constructor(
                 queryMatch && statusMatch && priorityMatch
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Flow for grouped tickets based on the *filtered* list
+    // This means if you search for "Printer", you'll see groups related to printers.
+    val ticketGroups: StateFlow<List<TicketGroup>> = filteredTickets.map { tickets ->
+        // Only group open tickets to avoid cluttering with closed ones
+        val openTickets = tickets.filter {
+            it.status == TicketStatus.Open || it.status == TicketStatus.InProgress
+        }
+        groupingEngine.groupTickets(openTickets)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // --- State for Ticket Detail Screen ---
     private val _selectedTicketId = MutableStateFlow<String?>(null)
@@ -70,11 +87,23 @@ class TicketViewModel @Inject constructor(
     // and re-fetches the linked articles whenever the ticket's 'linkedArticles' list changes.
     val linkedArticles: StateFlow<List<KBArticle>> = selectedTicket
         .filterNotNull()
-        .map { it.linkedArticles }
+        .map { ticket ->
+            Log.d("TrackrDebug", "1. Ticket Changed: ${ticket.id}, Links: ${ticket.linkedArticles}")
+            ticket.linkedArticles
+        }
         .flatMapLatest { articleIds ->
             if (articleIds.isNotEmpty()) {
+                Log.d("TrackrDebug", "2. Fetching ${articleIds.size} articles from Repo...")
                 kbRepository.getArticlesByIds(articleIds)
+                    .onEach { articles ->
+                        Log.d("TrackrDebug", "3. Articles Found: ${articles.size}")
+                    }
+                    .catch { e ->
+                        Log.e("TrackrDebug", "Error fetching articles", e)
+                        emit(emptyList())
+                    }
             } else {
+                Log.d("TrackrDebug", "2. No links found, returning empty.")
                 flowOf(emptyList())
             }
         }
@@ -109,6 +138,12 @@ class TicketViewModel @Inject constructor(
     }
 
     // --- Functions ---
+
+    // Toggle function
+    fun toggleGroupView() {
+        _isGroupView.value = !_isGroupView.value
+    }
+
     fun onSearchQueryChange(query: String) { _searchQuery.value = query }
     fun onStatusSelected(status: TicketStatus?) { _selectedStatus.value = status }
     fun onPrioritySelected(priority: Priority?) { _selectedPriority.value = priority }
@@ -131,8 +166,14 @@ class TicketViewModel @Inject constructor(
         viewModelScope.launch {
             _detailState.value = TicketDetailState.Loading
             ticketRepository.linkArticleToTicket(ticketId, articleId)
-                .onSuccess { _detailState.value = TicketDetailState.Success }
-                .onFailure { _detailState.value = TicketDetailState.Error(it.message ?: "Failed to link article") }
+                .onSuccess {
+                    Log.d("TrackrDebug", "Link Success!")
+                    _detailState.value = TicketDetailState.Success
+                }
+                .onFailure {
+                    Log.e("TrackrDebug", "Link Failed", it)
+                    _detailState.value = TicketDetailState.Error(it.message ?: "Failed to link")
+                }
         }
     }
 

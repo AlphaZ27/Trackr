@@ -7,6 +7,7 @@ import com.example.trackr.domain.model.KBArticle
 import com.example.trackr.domain.model.Feedback
 import com.google.firebase.firestore.FieldPath
 import com.example.trackr.domain.repository.KBRepository
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.channels.awaitClose
@@ -33,7 +34,10 @@ class KBRepositoryImpl @Inject constructor(
                     close(error)
                     return@addSnapshotListener
                 }
-                val articles = snapshot?.toObjects(KBArticle::class.java) ?: emptyList()
+                //val articles = snapshot?.toObjects(KBArticle::class.java) ?: emptyList()
+                val articles = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(KBArticle::class.java)?.copy(id = doc.id)
+                } ?: emptyList()
                 trySend(articles).isSuccess
             }
         // This is called when the flow is cancelled.
@@ -45,7 +49,8 @@ class KBRepositoryImpl @Inject constructor(
     override suspend fun getArticleById(articleId: String): Result<KBArticle?> {
         return try {
             val document = firestore.collection("articles").document(articleId).get().await()
-            val article = document.toObject(KBArticle::class.java)
+            //val article = document.toObject(KBArticle::class.java)
+            val article = document.toObject(KBArticle::class.java)?.copy(id = document.id)
             Result.success(article)
         } catch (e: Exception) {
             Result.failure(e)
@@ -69,7 +74,10 @@ class KBRepositoryImpl @Inject constructor(
                     close(error)
                     return@addSnapshotListener
                 }
-                val articles = snapshot?.toObjects(KBArticle::class.java) ?: emptyList()
+                //val articles = snapshot?.toObjects(KBArticle::class.java) ?: emptyList()
+                val articles = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(KBArticle::class.java)?.copy(id = doc.id)
+                } ?: emptyList()
                 trySend(articles).isSuccess
             }
         awaitClose { listener.remove() }
@@ -139,7 +147,7 @@ class KBRepositoryImpl @Inject constructor(
         }
     }
 
-    /*
+    /**
     * Submits feedback for a specific Knowledge Base article.
      */
 
@@ -147,6 +155,51 @@ class KBRepositoryImpl @Inject constructor(
         return try {
             val feedbackWithUser = feedback.copy(userId = auth.currentUser?.uid ?: "unknown")
             firestore.collection("feedback").add(feedbackWithUser).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override fun getFrequentArticles(limit: Int): Flow<List<KBArticle>> = callbackFlow {
+        val listener = firestore.collection("articles")
+            .whereEqualTo("status", ArticleStatus.Published.name)
+            .orderBy("viewCount", Query.Direction.DESCENDING) // Simple "Frequent" logic for now
+            .limit(limit.toLong())
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { close(error); return@addSnapshotListener }
+                val articles = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(KBArticle::class.java)?.copy(id = doc.id)
+                } ?: emptyList()
+                trySend(articles)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    override suspend fun incrementViewCount(articleId: String): Result<Unit> {
+        return try {
+            firestore.collection("articles").document(articleId)
+                .update("viewCount", FieldValue.increment(1)) // Atomic increment
+                .await()
+            // Also update 'lastViewedAt' timestamp for recency logic
+            firestore.collection("articles").document(articleId)
+                .update("lastViewedAt", FieldValue.serverTimestamp())
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun logSearchGap(searchTerm: String): Result<Unit> {
+        return try {
+            // We store these in a separate collection for analytics
+            val gapData = hashMapOf(
+                "term" to searchTerm,
+                "timestamp" to FieldValue.serverTimestamp(),
+                "userId" to (auth.currentUser?.uid ?: "anonymous")
+            )
+            firestore.collection("search_gaps").add(gapData).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

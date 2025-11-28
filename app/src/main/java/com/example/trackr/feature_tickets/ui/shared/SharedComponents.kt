@@ -1,20 +1,27 @@
 package com.example.trackr.feature_tickets.ui.shared
 
-
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.material3.ExposedDropdownMenuAnchorType.Companion.PrimaryNotEditable
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.example.trackr.domain.model.Priority
 import com.example.trackr.domain.model.TicketStatus
+import com.example.trackr.domain.model.User
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 
 // A hardcoded list of categories for the app
-val ticketCategories = listOf("General", "IT", "Hardware", "Software", "HR", "Facilities")
+val ticketCategories = listOf("General", "IT Services", "Hardware", "Software", "OnBoarding", "Networking & VPN")
 
 // Helper functions to make the enum names look nice in the UI
-fun Priority.displayName(): String = this.name
-fun TicketStatus.displayName(): String = this.name.replace("([a-z])([A-Z])".toRegex(), "$1 $2")
+//fun Priority.displayName(): String = this.name
+//fun TicketStatus.displayName(): String = this.name.replace("([a-z])([A-Z])".toRegex(), "$1 $2")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -156,6 +163,141 @@ fun CategoryDropdown(
                     }
                 )
             }
+        }
+    }
+}
+
+// Assignee dropdown
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AssigneeDropdown(
+    allUsers: List<User>,
+    selectedUser: User?,
+    onUserSelected: (User?) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
+    ) {
+        OutlinedTextField(
+            value = selectedUser?.name ?: "Unassigned",
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Assignee") },
+            trailingIcon = {
+                // Add a clear button
+                if (selectedUser != null) {
+                    IconButton(onClick = { onUserSelected(null) }) {
+                        Icon(Icons.Default.Clear, contentDescription = "Clear Selection")
+                    }
+                } else {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                }
+            },
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text("Unassigned") },
+                onClick = {
+                    onUserSelected(null)
+                    expanded = false
+                }
+            )
+            allUsers.forEach { user ->
+                DropdownMenuItem(
+                    text = { Text(user.name) },
+                    onClick = {
+                        onUserSelected(user)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+// --- Helper Functions for Colors ---
+
+@Composable
+fun TicketStatus.toColor(): Color {
+    return when (this) {
+        TicketStatus.Open -> MaterialTheme.colorScheme.error
+        TicketStatus.InProgress -> Color(0xFFFFA500) // Orange
+        TicketStatus.Closed -> Color(0xFF008000) // Green
+    }
+}
+
+@Composable
+fun Priority.toColor(): Color {
+    return when (this) {
+        Priority.Low -> Color.Gray
+        Priority.Medium -> MaterialTheme.colorScheme.primary
+        Priority.High -> Color(0xFFFF9800) // Orange
+        Priority.Urgent -> MaterialTheme.colorScheme.error
+    }
+}
+
+// --- Helper Function for Display Names ---
+fun TicketStatus.displayName(): String {
+    return when (this) {
+        TicketStatus.Open -> "Open"
+        TicketStatus.InProgress -> "In Progress"
+        TicketStatus.Closed -> "Closed"
+    }
+}
+
+fun Priority.displayName(): String {
+    return when (this) {
+        Priority.Low -> "Low"
+        Priority.Medium -> "Medium"
+        Priority.High -> "High"
+        Priority.Urgent -> "Urgent"
+    }
+}
+
+
+// **TICKET DETAIL CARD**
+@Composable
+fun TicketDetailCard(
+    label: String,
+    value: String,
+    valueColor: Color = Color.Unspecified // Default to local text color
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = if (valueColor == Color.Unspecified) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    valueColor
+                }
+            )
         }
     }
 }

@@ -49,4 +49,22 @@ interface KBRepository {
      */
     suspend fun saveArticle(articleId: String): Result<Unit>
 
+    /**
+    * Get a list of the most frequently accessed articles. (views + recency)
+    * @param limit The maximum number of articles to retrieve.
+     */
+    fun getFrequentArticles(limit: Int = 10): Flow<List<KBArticle>>
+
+    // 2.5 Article Metrics: Increment view count when an article is opened
+    /**
+     * Increments the view count for a specific Knowledge Base article.
+     */
+    suspend fun incrementViewCount(articleId: String): Result<Unit>
+
+    // 2.3 Gap Detection: Log a search term that had 0 results
+    /**
+     * Logs a search term that had 0 results.
+     */
+    suspend fun logSearchGap(searchTerm: String): Result<Unit>
+
 }

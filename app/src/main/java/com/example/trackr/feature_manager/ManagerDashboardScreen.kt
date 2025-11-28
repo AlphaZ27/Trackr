@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.trackr.domain.model.DashboardStats
 import com.example.trackr.domain.model.User
@@ -27,8 +28,11 @@ import com.example.trackr.ui.HomeScreen
 import com.example.trackr.ui.charts.ResolvedTicketsLineChart
 import com.example.trackr.ui.charts.TicketAgingBarChart
 import com.example.trackr.domain.model.CategoryStat
+import com.example.trackr.domain.model.TicketGroup
 import com.example.trackr.ui.charts.TicketPieChart
 import com.example.trackr.util.ReportGenerator
+import com.example.trackr.domain.model.UserPerformance
+import java.text.DecimalFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,24 +46,36 @@ fun ManagerDashboardScreen(
 ) {
 
     val userActivityList by viewModel.userActivityReport.collectAsState()
-    val users by viewModel.filteredUsers.collectAsState() // Use filtered users
+    //val users by viewModel.filteredUsers.collectAsState() // Use filtered users
+    val userPerformanceList by viewModel.userPerformanceReport.collectAsState()
     val stats by viewModel.stats.collectAsState()
     val agingStats by viewModel.ticketAgingStats.collectAsState()
-    val resolvedStats by viewModel.resolvedTicketStats.collectAsState() // **NEW**
+    val resolvedStats by viewModel.resolvedTicketStats.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
 
     val openCategoryStats by viewModel.openTicketsByCategoryStats.collectAsState()
 
+    val suggestedGroups by viewModel.suggestedGroups.collectAsState()
+
+    // Ensure lists are unique to prevent crashes
+    val uniqueUserActivityList = remember(userActivityList) {
+        userActivityList.distinctBy { it.user.id }
+    }
+    val uniqueUserPerformanceList = remember(userPerformanceList) {
+        userPerformanceList.distinctBy { it.user.id }
+    }
+
     // For launching the share intent
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val reportGenerator = remember { ReportGenerator() }
+//    val context = LocalContext.current
+//    val scope = rememberCoroutineScope()
+//    val reportGenerator = remember { ReportGenerator() }
 
     LazyColumn(
         // Apply modifier here
         modifier = modifier.padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Top Ticket Summary Cards
         item {
             Text(
                 "Ticket Summary",
@@ -69,6 +85,7 @@ fun ManagerDashboardScreen(
             TicketStatsSection(stats = stats)
         }
 
+        // Charts Section
         if (openCategoryStats.isNotEmpty()) {
             item {
                 Text(
@@ -100,33 +117,39 @@ fun ManagerDashboardScreen(
                 modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
             )
             Card(modifier = Modifier.fillMaxWidth()) {
-                // **CHECK IF DATA EXISTS**:
-                // The chart library crashes if all values are 0.
-                val hasData = resolvedStats.last7Days > 0 ||
-                        resolvedStats.last30Days > 0 ||
-                        resolvedStats.last90Days > 0
-
-                if (hasData) {
-                    ResolvedTicketsLineChart(stats = resolvedStats)
-                } else {
-                    // Show a placeholder instead of crashing
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "No resolved tickets in the last 90 days.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                ResolvedTicketsLineChart(stats = resolvedStats)
             }
         }
 
+        // Suggested Groups Section
+        if (suggestedGroups.isNotEmpty()) {
+            item {
+                Text(
+                    "Suggested Ticket Groups",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                )
+            }
+            items(suggestedGroups) { group ->
+                TicketGroupCard(group = group, onConfirm = { viewModel.confirmGroup(group) })
+            }
+        }
+
+        // User Performance Section
+        if (userPerformanceList.isNotEmpty()) {
+            item {
+                Text(
+                    "Team Performance (Tickets Assigned)",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                )
+            }
+            items(userPerformanceList, key = { "perf_${it.user.id}" }) { perf ->
+                UserPerformanceCard(perf)
+            }
+        }
+
+        // User Activity Section
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -134,11 +157,10 @@ fun ManagerDashboardScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Standard Users",
+                    "Standard Users (Tickets Created)",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
-                // !!REMEMBER!!: The Share button is now a FAB in AppNavigation
             }
         }
 
@@ -160,7 +182,7 @@ fun ManagerDashboardScreen(
                 )
             }
         } else {
-            items(userActivityList, key = { it.user.id }) { userActivity ->
+            items(userActivityList, key = { "activity_${it.user.id}" }) { userActivity ->
                 UserCard(
                     user = userActivity.user,
                     openTickets = userActivity.openTickets,
@@ -168,18 +190,48 @@ fun ManagerDashboardScreen(
                 )
             }
         }
+
     }
 }
 
 // Helper function to create and start the share intent
-private fun shareReport(context: Context, uri: Uri) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/csv"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        putExtra(Intent.EXTRA_SUBJECT, "User Report")
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+//private fun shareReport(context: Context, uri: Uri) {
+//    val intent = Intent(Intent.ACTION_SEND).apply {
+//        type = "text/csv"
+//        putExtra(Intent.EXTRA_STREAM, uri)
+//        putExtra(Intent.EXTRA_SUBJECT, "User Report")
+//        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+//    }
+//    context.startActivity(Intent.createChooser(intent, "Share User Report"))
+//}
+
+@Composable
+private fun UserPerformanceCard(perf: UserPerformance) {
+    val decimalFormat = remember { DecimalFormat("#.#") }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(perf.user.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text("Tickets Closed: ${perf.ticketsClosed}", style = MaterialTheme.typography.bodyMedium)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = if (perf.ticketsClosed > 0) "${decimalFormat.format(perf.avgResolutionHours)} hrs" else "N/A",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text("Avg. Time", style = MaterialTheme.typography.labelSmall)
+            }
+        }
     }
-    context.startActivity(Intent.createChooser(intent, "Share User Report"))
 }
 
 @Composable
@@ -230,6 +282,23 @@ private fun UserCard(
             Column(horizontalAlignment = Alignment.End) {
                 Text("Open: $openTickets", style = MaterialTheme.typography.bodySmall)
                 Text("Closed: $closedTickets", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+fun TicketGroupCard(group: TicketGroup, onConfirm: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(group.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text("${group.size} similar tickets found", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = onConfirm, modifier = Modifier.align(Alignment.End)) {
+                Text("Group Tickets")
             }
         }
     }

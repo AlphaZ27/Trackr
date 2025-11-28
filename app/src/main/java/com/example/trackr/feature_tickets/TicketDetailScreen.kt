@@ -1,252 +1,241 @@
 package com.example.trackr.feature_tickets
 
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import kotlinx.coroutines.launch
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.trackr.domain.model.KBArticle
 import com.example.trackr.domain.model.Ticket
-import java.text.SimpleDateFormat
 import com.example.trackr.feature_kb.ArticleCard
-import com.example.trackr.feature_tickets.ui.shared.PriorityDropdown
-import com.example.trackr.feature_tickets.ui.shared.StatusDropdown
-import java.util.*
-
+import com.example.trackr.feature_tickets.TicketDetailState
+import com.example.trackr.feature_tickets.TicketViewModel
+import com.example.trackr.feature_tickets.ui.shared.TicketDetailCard
+import com.example.trackr.feature_tickets.ui.shared.displayName
+import com.example.trackr.feature_tickets.ui.shared.toColor
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TicketDetailScreen(
     ticketId: String,
-    ticketViewModel: TicketViewModel = hiltViewModel(),
-    onNavigateToUpdate: (String) -> Unit,
-    onNavigateToArticle: (String) -> Unit,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToEdit: (String) -> Unit,
+    onNavigateToArticle: (String) -> Unit, // Added navigation for articles
+    viewModel: TicketViewModel = hiltViewModel()
 ) {
-    val ticket by ticketViewModel.selectedTicket.collectAsState()
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    val ticket by viewModel.selectedTicket.collectAsState()
+    val detailState by viewModel.detailState.collectAsState()
+    val linkedArticles by viewModel.linkedArticles.collectAsState()
+
+    // State for the dialog
     var showLinkDialog by remember { mutableStateOf(false) }
 
-    val detailState by ticketViewModel.detailState.collectAsState()
+    // Fetch the ticket when the screen is first composed
+    LaunchedEffect(key1 = ticketId) {
+        viewModel.getTicketById(ticketId)
+    }
 
-    // --- UI Feedback Logic ---
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(detailState) {
-        when (val state = detailState) {
-            is TicketDetailState.Success -> {
-                scope.launch {
-                    snackbarHostState.showSnackbar("Success!")
-                }
-                ticketViewModel.resetDetailState()
-                // We only navigate back for major updates/deletes, not for link/unlink
-                if (true) { // A bit of a trick to not nav on initial load
-                    onNavigateBack() // This is for when you want to pop back on quick save
-                }
-            }
-            is TicketDetailState.Error -> {
-                scope.launch {
-                    snackbarHostState.showSnackbar("Error: ${state.message}")
-                }
-                ticketViewModel.resetDetailState()
-            }
-            else -> {}
+    // Navigate back if a delete/update/link was successful
+    LaunchedEffect(key1 = detailState) {
+        if (detailState is TicketDetailState.Success) {
+            viewModel.resetDetailState() // Reset state
+            // We no longer navigate back automatically,
+            // as updates are handled on a different screen.
         }
     }
 
-//    LaunchedEffect(detailState) {
-//        if (detailState is TicketDetailState.Success) {
-//            onNavigateBack()
-//        }
-//    }
-
-    // Fetch the ticket details when the screen is first launched
-    LaunchedEffect(key1 = ticketId) {
-        ticketViewModel.getTicketById(ticketId)
-    }
-
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) }, // The snackbar host
         topBar = {
             TopAppBar(
-                title = { Text(text = "Ticket #${ticketId.take(6).uppercase()}") },
+                title = { Text("#${ticketId.take(6).uppercase()}") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
-                },
-                actions = {
-                    IconButton(onClick = { onNavigateToUpdate(ticketId) }) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit Ticket")
-                    }
-                    IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete Ticket")
-                    }
                 }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { onNavigateToEdit(ticketId) }) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit Ticket")
+            }
         }
     ) { paddingValues ->
-        // Show loading indicator while ticket is being fetched
         if (ticket == null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else {
+            // We pass the modifier from the Scaffold
             TicketDetailContent(
-                modifier = Modifier.padding(paddingValues),
                 ticket = ticket!!,
-                onSaveChanges = { updatedTicket ->
-                    ticketViewModel.updateTicket(updatedTicket)
-                    onNavigateBack()
-                },
-                onNavigateToArticle = onNavigateToArticle,
-                onLinkArticleClick = { showLinkDialog = true } // Show the dialog when the link button is clicked
+                linkedArticles = linkedArticles, // Pass the list
+                modifier = Modifier.padding(paddingValues),
+                onLinkArticleClick = { showLinkDialog = true }, // Open dialog
+                onUnlinkArticle = { articleId -> viewModel.unlinkArticle(ticketId, articleId) },
+                onNavigateToArticle = onNavigateToArticle
             )
         }
-    }
-
-    if (showDeleteDialog) {
-        DeleteConfirmationDialog(
-            onConfirm = {
-                ticketViewModel.deleteTicket(ticketId)
-                showDeleteDialog = false
-                onNavigateBack()
-            },
-            onDismiss = { showDeleteDialog = false }
-        )
-    }
-
-    // Show the new dialog for linking articles
-    if (showLinkDialog) {
-        LinkArticleDialog(
-            viewModel = ticketViewModel,
-            onDismiss = { showLinkDialog = false },
-            onArticleSelected = { articleId ->
-                ticketViewModel.linkArticle(ticketId, articleId)
-                showLinkDialog = false
-            }
-        )
+        if (showLinkDialog) {
+            LinkArticleDialog(
+                viewModel = viewModel,
+                onDismiss = { showLinkDialog = false },
+                onArticleSelected = { articleId ->
+                    viewModel.linkArticle(ticketId, articleId)
+                    showLinkDialog = false
+                }
+            )
+        }
     }
 }
 
 @Composable
-fun TicketDetailContent(
-    modifier: Modifier = Modifier,
+private fun TicketDetailContent(
     ticket: Ticket,
-    onSaveChanges: (Ticket) -> Unit,
-    onNavigateToArticle: (String) -> Unit,
-    onLinkArticleClick: () -> Unit // New callback for the button
+    linkedArticles: List<KBArticle>, // Added parameter
+    modifier: Modifier = Modifier,
+    onLinkArticleClick: () -> Unit,
+    onUnlinkArticle: (String) -> Unit,
+    onNavigateToArticle: (String) -> Unit
 ) {
+    val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy 'at' hh:mm a", Locale.getDefault()) }
 
-    // Inject the ViewModel to get the linked articles
-    val ticketViewModel: TicketViewModel = hiltViewModel()
-    val linkedArticles by ticketViewModel.linkedArticles.collectAsState()
-
-    var currentStatus by remember { mutableStateOf(ticket.status) }
-    var currentPriority by remember { mutableStateOf(ticket.priority) }
-    val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy, hh:mm a", Locale.getDefault()) }
-
-    Column(
+    LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) { // Have to add assignee and resolution
-        Text("Title", style = MaterialTheme.typography.labelMedium)
-        Text(ticket.name, style = MaterialTheme.typography.bodyLarge)
+    ) {
+        item {
+            Text(
+                text = ticket.name,
+                style = MaterialTheme.typography.headlineMedium
+            )
+        }
 
-        Text("Department", style = MaterialTheme.typography.labelMedium)
-        Text(ticket.department, style = MaterialTheme.typography.bodyLarge)
+        item {
+            TicketDetailCard(
+                label = "Status",
+                value = ticket.status.displayName(),
+                valueColor = ticket.status.toColor()
+            )
+        }
 
-        Text("Description", style = MaterialTheme.typography.labelMedium)
-        Text(ticket.description, style = MaterialTheme.typography.bodyLarge)
+        item {
+            TicketDetailCard(
+                label = "Priority",
+                value = ticket.priority.displayName(),
+                valueColor = ticket.priority.toColor()
+            )
+        }
 
-        Text("Assignee", style = MaterialTheme.typography.labelMedium)
-        Text(ticket.assignee, style = MaterialTheme.typography.bodyLarge)
+        item {
+            TicketDetailCard(
+                label = "Category",
+                value = ticket.category
+            )
+        }
 
-        Text("Resolution", style = MaterialTheme.typography.labelMedium)
-        Text(ticket.resolutionDescription, style = MaterialTheme.typography.bodyLarge)
+        item {
+            TicketDetailCard(
+                label = "Department",
+                value = ticket.department
+            )
+        }
 
-        Text("Created Date", style = MaterialTheme.typography.labelMedium)
-        Text(dateFormatter.format(ticket.createdDate.toDate()))
+        item {
+            TicketDetailCard(
+                label = "Created",
+                value = dateFormatter.format(ticket.createdDate.toDate())
+            )
+        }
 
-        Spacer(modifier = Modifier.padding(vertical = 8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Linked Articles", style = MaterialTheme.typography.titleMedium)
-            TextButton(onClick = onLinkArticleClick) {
-                Text("Link Article")
+        item {
+            Text(
+                text = "Description",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            Text(
+                text = ticket.description.ifBlank { "No description provided." },
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+
+        if (ticket.resolutionDescription.isNotBlank()) {
+            item {
+                Text(
+                    text = "Resolution",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                Text(
+                    text = ticket.resolutionDescription,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
             }
         }
+        item {
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Linked Articles", style = MaterialTheme.typography.titleMedium)
+                TextButton(onClick = onLinkArticleClick) {
+                    Text("Link Article")
+                }
+            }
+        }
+
         if (linkedArticles.isEmpty()) {
-            Text("No articles linked yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            item {
+                Text(
+                    text = "No articles linked yet.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                linkedArticles.forEach { article ->
-                    Box {
-                        ArticleCard(article = article, onClick = { onNavigateToArticle(article.id) })
-                        IconButton(
-                            onClick = { ticketViewModel.unlinkArticle(ticket.id, article.id) },
-                            modifier = Modifier.align(Alignment.TopEnd)
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Unlink Article",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                        }
+            items(linkedArticles) { article ->
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    // Re-use your existing ArticleCard
+                    ArticleCard(
+                        article = article,
+                        onClick = { onNavigateToArticle(article.id) }
+                    )
+                    // Add Unlink button on top
+                    IconButton(
+                        onClick = { onUnlinkArticle(article.id) },
+                        modifier = Modifier.align(Alignment.TopEnd)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Unlink Article",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
                     }
                 }
             }
         }
-        Spacer(modifier = Modifier.padding(vertical = 8.dp))
-
-        // The priority editable field
-        PriorityDropdown(
-            selectedPriority = currentPriority,
-            onPrioritySelected = { currentPriority = it }
-        )
-
-        // The status editable field
-        StatusDropdown(
-            selectedStatus = currentStatus,
-            onStatusSelected = { currentStatus = it }
-        )
-
-        Spacer(modifier = Modifier.weight(1.0f)) // Pushes button to the bottom
-
-        Button( // This button saves the changes to the ticket on this screen and update ticket screen
-            onClick = {
-                val updatedTicket = ticket.copy(
-                    priority = currentPriority,
-                    status = currentStatus
-                )
-                onSaveChanges(updatedTicket)
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = currentStatus != ticket.status || currentPriority != ticket.priority // Only enable if changes were made
-        ) {
-            Text("Save Quick Changes")
+        // Add some bottom padding for the FAB
+        item {
+            Spacer(Modifier.height(64.dp))
         }
     }
 }
@@ -272,44 +261,26 @@ private fun LinkArticleDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.height(300.dp) // Limit height
+                ) {
                     items(articles, key = { it.id }) { article ->
                         Text(
                             text = article.title,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onArticleSelected(article.id) }
-                                .padding(vertical = 8.dp)
+                                .padding(vertical = 12.dp),
+                            style = MaterialTheme.typography.bodyLarge
                         )
+                        HorizontalDivider()
                     }
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("Close") }
-        }
-    )
-}
-
-
-@Composable
-fun DeleteConfirmationDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Delete Ticket") },
-        text = { Text("Are you sure you want to permanently delete this ticket? This action cannot be undone.") },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-            ) {
-                Text("Delete")
-            }
-        },
-        dismissButton = {
-            Button(onClick = onDismiss) {
-                Text("Cancel")
-            }
         }
     )
 }

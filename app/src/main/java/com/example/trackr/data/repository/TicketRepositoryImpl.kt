@@ -86,41 +86,33 @@ class TicketRepositoryImpl @Inject constructor(
     override fun getTicketById(ticketId: String): Flow<Ticket?> = callbackFlow {
         val listener = firestore.collection("tickets").document(ticketId)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                val ticket = snapshot?.toObject(Ticket::class.java)
-                trySend(ticket).isSuccess
+                if (error != null) { close(error); return@addSnapshotListener }
+                // Ensure ID is mapped
+                val ticket = snapshot?.toObject(Ticket::class.java)?.copy(id = snapshot.id)
+                trySend(ticket)
             }
         awaitClose { listener.remove() }
     }
 
     override suspend fun updateTicket(ticket: Ticket): Result<Unit> {
         return try {
-            val ticketRef = firestore.collection("tickets").document(ticket.id)
+            val updatedTicket = when {
+                // 1. Closing a ticket: Add timestamp
+                ticket.status == TicketStatus.Closed && ticket.closedAt == null -> {
+                    ticket.copy(closedAt = Timestamp.now())
+                }
+                // 2. Re-opening a ticket: Remove timestamp
+                ticket.status != TicketStatus.Closed && ticket.closedAt != null -> {
+                    ticket.copy(closedAt = null)
+                }
+                // 3. No status change: Keep existing data
+                else -> ticket
+            }
 
-            // Check if the status is Closed
-            val isClosing = ticket.status == TicketStatus.Closed
+            // Use SetOptions.merge() to update safely
+            firestore.collection("tickets").document(updatedTicket.id)
+                .set(updatedTicket, SetOptions.merge()).await()
 
-            // Create a map of fields to update
-            val updates = mutableMapOf<String, Any?>(
-                "name" to ticket.name,
-                "assignee" to ticket.assignee,
-                "priority" to ticket.priority,
-                "description" to ticket.description,
-                "department" to ticket.department,
-                "status" to ticket.status,
-                "resolutionDescription" to ticket.resolutionDescription,
-                "category" to ticket.category,
-                // Set closedAt timestamp if closing, otherwise set to null (re-opening)
-                "closedAt" to if (isClosing) Timestamp.now() else null
-            )
-
-            // This merges the updateTicket function and will update all fields from the ticket object passed to it.
-            firestore.collection("tickets").document(ticket.id)
-                .set(ticket, SetOptions.merge()).await()
-            // ticketRef.update(updates).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -178,9 +170,43 @@ class TicketRepositoryImpl @Inject constructor(
                     close(error)
                     return@addSnapshotListener
                 }
-                val tickets = snapshot?.toObjects(Ticket::class.java) ?: emptyList()
+//                val tickets = snapshot?.toObjects(Ticket::class.java) ?: emptyList()
+                val tickets = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(Ticket::class.java)?.copy(id = doc.id)
+                } ?: emptyList()
                 trySend(tickets).isSuccess
             }
         awaitClose { listener.remove() }
+    }
+
+    override fun getRecentOpenTickets(): Flow<List<Ticket>> = callbackFlow {
+        // Fetch open/in-progress tickets from the last 7 days (optional time limit)
+        val listener = firestore.collection("tickets")
+            .whereIn("status", listOf(TicketStatus.Open.name, TicketStatus.InProgress.name))
+            .orderBy("createdDate", Query.Direction.DESCENDING)
+            .limit(50) // Limit to 50 for performance during check
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { close(error); return@addSnapshotListener }
+                val tickets = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(Ticket::class.java)?.copy(id = doc.id)
+                } ?: emptyList()
+                trySend(tickets)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    override suspend fun groupTickets(ticketIds: List<String>, groupId: String): Result<Unit> {
+        return try {
+            val batch = firestore.batch()
+            ticketIds.forEach { id ->
+                val ref = firestore.collection("tickets").document(id)
+                // Update the 'groupId' field for each ticket in the batch
+                batch.update(ref, "groupId", groupId)
+            }
+            batch.commit().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }
