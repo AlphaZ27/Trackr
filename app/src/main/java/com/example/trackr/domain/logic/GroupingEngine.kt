@@ -11,18 +11,42 @@ class GroupingEngine @Inject constructor(
     /**
      * Groups a list of tickets based on similarity.
      * Returns a list of TicketGroups.
+     * 1. Aggregates tickets that ALREADY have a persistent groupId (Confirmed groups).
+     * 2. Scans remaining "ungrouped" tickets for similarity (Potential groups).
      */
     fun groupTickets(tickets: List<Ticket>): List<TicketGroup> {
-        val groups = mutableListOf<TicketGroup>()
-        val processedIds = mutableSetOf<String>()
+        val allGroups = mutableListOf<TicketGroup>()
 
-        // Only group tickets that don't already have a group ID
+        // --- Handle Persisted Groups ---
+        // Group by the non-null groupId
+        val persistedGroups = tickets
+            .filter { it.groupId != null }
+            .groupBy { it.groupId!! }
+
+        persistedGroups.forEach { (groupId, groupTickets) ->
+            if (groupTickets.isNotEmpty()) {
+                // Use the name of the most recent ticket as the title, or a generic one
+                val primaryTicket = groupTickets.maxByOrNull { it.createdDate } ?: groupTickets.first()
+                allGroups.add(
+                    TicketGroup(
+                        id = groupId,
+                        title = "Group: ${primaryTicket.name}", // Or fetch a saved group name if you have a separate collection
+                        tickets = groupTickets,
+                        size = groupTickets.size
+                    )
+                )
+            }
+        }
+
+        // --- Handle Auto-Suggestions (Similarity) ---
+        // Only look at tickets that are NOT already in a group
         val ungrouppedTickets = tickets.filter { it.groupId == null }
+        val processedIds = mutableSetOf<String>()
 
         ungrouppedTickets.forEach { currentTicket ->
             if (currentTicket.id in processedIds) return@forEach
 
-            // Find similar tickets
+            // Find similar tickets among the remaining ungrouped ones
             val similarTickets = ungrouppedTickets.filter { candidate ->
                 candidate.id != currentTicket.id &&
                         candidate.id !in processedIds &&
@@ -31,17 +55,18 @@ class GroupingEngine @Inject constructor(
 
             if (similarTickets.isNotEmpty()) {
                 val groupList = similarTickets + currentTicket
-                val groupTitle = "Issue: ${currentTicket.name}" // Simple title generation
-                val groupId = currentTicket.id // Use the first ticket's ID as the group ID
+                val groupTitle = "Potential Issue: ${currentTicket.name}"
+                // For potential groups, we generate a temporary ID (usually the first ticket's ID)
+                val tempGroupId = currentTicket.id
 
-                groups.add(TicketGroup(groupId, groupTitle, groupList, groupList.size))
+                allGroups.add(TicketGroup(tempGroupId, groupTitle, groupList, groupList.size))
 
-                // Mark all as processed
+                // Mark all as processed so we don't duplicate them
                 groupList.forEach { processedIds.add(it.id) }
             }
         }
 
-        return groups
+        return allGroups.sortedByDescending { it.size }
     }
 
     private fun isSimilar(t1: Ticket, t2: Ticket): Boolean {

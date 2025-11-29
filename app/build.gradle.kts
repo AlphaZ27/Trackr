@@ -57,6 +57,8 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/LICENSE.md"
+            excludes += "META-INF/LICENSE-notice.md"
         }
     }
 }
@@ -71,15 +73,17 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     kapt("com.google.dagger:hilt-compiler:2.57.2")
     implementation("androidx.hilt:hilt-navigation-compose:1.3.0")
+    kapt("androidx.hilt:hilt-compiler:1.2.0")
 
     // Work Manager Dependency
     //implementation(platform("androidx.work:work-bom:2.9.0"))
     implementation("androidx.work:work-runtime-ktx:2.11.0")
+    implementation("androidx.hilt:hilt-work:1.2.0")
 
 
     //implementation("org.jetbrains.kotlinx:kotlinx-metadata-jvm:0.9.0")
-    //implementation("androidx.hilt:hilt-work:1.2.0")
-    //kapt("androidx.hilt:hilt-compiler:1.2.0")
+    //
+    //
 
 
     // Jetpack Compose
@@ -101,6 +105,7 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation("com.google.firebase:firebase-auth-ktx:23.2.1")
     implementation("com.google.firebase:firebase-firestore-ktx:25.1.4")
+    implementation("com.google.firebase:firebase-messaging")
 
     // datastore
     implementation("androidx.datastore:datastore-preferences:1.1.7")

@@ -92,4 +92,17 @@ class AuthRepositoryImpl @Inject constructor(
             null
         }
     }
+
+    override suspend fun updateFcmToken(token: String) {
+        val currentUser = firebaseAuth.currentUser
+        if (currentUser != null) {
+            try {
+                firestore.collection("users").document(currentUser.uid)
+                    .update("fcmToken", token)
+                    .await()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 }

@@ -10,15 +10,19 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.trackr.domain.model.KBArticle
 import com.example.trackr.domain.model.Ticket
+import com.example.trackr.domain.model.TicketStatus
 import com.example.trackr.feature_kb.ArticleCard
 import com.example.trackr.feature_tickets.TicketDetailState
 import com.example.trackr.feature_tickets.TicketViewModel
@@ -35,7 +39,8 @@ fun TicketDetailScreen(
     onNavigateBack: () -> Unit,
     onNavigateToEdit: (String) -> Unit,
     onNavigateToArticle: (String) -> Unit, // Added navigation for articles
-    viewModel: TicketViewModel = hiltViewModel()
+    viewModel: TicketViewModel = hiltViewModel(),
+    onSubmitCsat: (Int) -> Unit
 ) {
     val ticket by viewModel.selectedTicket.collectAsState()
     val detailState by viewModel.detailState.collectAsState()
@@ -87,7 +92,8 @@ fun TicketDetailScreen(
                 modifier = Modifier.padding(paddingValues),
                 onLinkArticleClick = { showLinkDialog = true }, // Open dialog
                 onUnlinkArticle = { articleId -> viewModel.unlinkArticle(ticketId, articleId) },
-                onNavigateToArticle = onNavigateToArticle
+                onNavigateToArticle = onNavigateToArticle,
+                onSubmitCsat = onSubmitCsat
             )
         }
         if (showLinkDialog) {
@@ -104,13 +110,54 @@ fun TicketDetailScreen(
 }
 
 @Composable
+fun CsatRatingCard(
+    currentScore: Int?,
+    onRate: (Int) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = if (currentScore != null) "You rated this ticket:" else "How was our service?",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                for (i in 1..5) {
+                    Icon(
+                        imageVector = if (i <= (currentScore ?: 0)) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = "Rate $i stars",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clickable { onRate(i) }
+                            .padding(4.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun TicketDetailContent(
     ticket: Ticket,
     linkedArticles: List<KBArticle>, // Added parameter
     modifier: Modifier = Modifier,
     onLinkArticleClick: () -> Unit,
     onUnlinkArticle: (String) -> Unit,
-    onNavigateToArticle: (String) -> Unit
+    onNavigateToArticle: (String) -> Unit,
+    onSubmitCsat: (Int) -> Unit
 ) {
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy 'at' hh:mm a", Locale.getDefault()) }
 
@@ -200,6 +247,18 @@ private fun TicketDetailContent(
                 TextButton(onClick = onLinkArticleClick) {
                     Text("Link Article")
                 }
+            }
+        }
+
+        if (ticket.status == TicketStatus.Closed) {
+            item {
+                CsatRatingCard(
+                    currentScore = ticket.csatScore,
+                    onRate = { score ->
+                        // You need to pass this callback up from the Screen
+                        onSubmitCsat(score)
+                    }
+                )
             }
         }
 

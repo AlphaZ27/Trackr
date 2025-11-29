@@ -39,6 +39,8 @@ class TicketViewModel @Inject constructor(
     val selectedStatus = _selectedStatus.asStateFlow()
     private val _selectedPriority = MutableStateFlow<Priority?>(null)
     val selectedPriority = _selectedPriority.asStateFlow()
+
+    // Data Flows
     private val _tickets = ticketRepository.getAllTickets()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -60,7 +62,7 @@ class TicketViewModel @Inject constructor(
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Flow for grouped tickets based on the *filtered* list
+    // Flow for grouped tickets based on the *filtered* list. Persisted and potential groups.
     // This means if you search for "Printer", you'll see groups related to printers.
     val ticketGroups: StateFlow<List<TicketGroup>> = filteredTickets.map { tickets ->
         // Only group open tickets to avoid cluttering with closed ones
@@ -69,6 +71,13 @@ class TicketViewModel @Inject constructor(
         }
         groupingEngine.groupTickets(openTickets)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // --- Dialog State for User Grouping ---
+    private val _showGroupingDialog = MutableStateFlow(false)
+    val showGroupingDialog = _showGroupingDialog.asStateFlow()
+
+    private val _suggestedGroups = MutableStateFlow<List<TicketGroup>>(emptyList())
+    val suggestedGroups = _suggestedGroups.asStateFlow()
 
     // --- State for Ticket Detail Screen ---
     private val _selectedTicketId = MutableStateFlow<String?>(null)
@@ -132,12 +141,45 @@ class TicketViewModel @Inject constructor(
 
     fun loadCurrentUserTickets() {
         viewModelScope.launch {
-            // ❗️ Call the new function
+            // !! Call the new function
             _ticket.value = ticketRepository.getTicketsForCurrentUser()
         }
     }
 
     // --- Functions ---
+
+    // Scan for groups to show in the Dialog
+    fun scanForSimilarTickets() {
+        val currentTickets = filteredTickets.value.filter {
+            it.groupId == null && (it.status == TicketStatus.Open || it.status == TicketStatus.InProgress)
+        }
+
+        // This will only return potential new groups (because we filtered out groupId != null above)
+        val suggestions = groupingEngine.groupTickets(currentTickets)
+
+        _suggestedGroups.value = suggestions
+        _showGroupingDialog.value = true
+    }
+
+    fun dismissGroupingDialog() {
+        _showGroupingDialog.value = false
+    }
+
+    // User confirms a group -> Save to Firestore
+    fun confirmGroup(group: TicketGroup) {
+        viewModelScope.launch {
+            val ids = group.tickets.map { it.id }
+            // Using the first ticket's ID as the group ID is a simple unique strategy
+            ticketRepository.groupTickets(ids, group.id)
+
+            // Remove this group from suggestions immediately for UI responsiveness
+            _suggestedGroups.value = _suggestedGroups.value.filter { it.id != group.id }
+
+            if (_suggestedGroups.value.isEmpty()) {
+                _showGroupingDialog.value = false
+            }
+        }
+    }
 
     // Toggle function
     fun toggleGroupView() {
@@ -183,6 +225,18 @@ class TicketViewModel @Inject constructor(
             ticketRepository.unlinkArticleFromTicket(ticketId, articleId)
                 .onSuccess { _detailState.value = TicketDetailState.Success }
                 .onFailure { _detailState.value = TicketDetailState.Error(it.message ?: "Failed to unlink article") }
+        }
+    }
+
+    fun submitCsat(ticketId: String, rating: Int) {
+        viewModelScope.launch {
+            // Update local state optimisticly if needed, or just wait for firestore
+            val updates = mapOf("csatScore" to rating)
+            // You might want to create a specific update function in Repository, but updateTicket works too if you fetch first
+            // Here we can use a direct firestore patch via repository if exposed,
+            // or just use the existing updateTicket flow:
+            val current = selectedTicket.value ?: return@launch
+            ticketRepository.updateTicket(current.copy(csatScore = rating))
         }
     }
 

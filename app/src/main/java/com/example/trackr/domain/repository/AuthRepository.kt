@@ -23,6 +23,9 @@ interface AuthRepository {
     // Logout function
     fun logoutUser()
 
+    // User Data
     suspend fun getCurrentUserData(): User?
 
+    // Update FCM Token
+    suspend fun updateFcmToken(token: String)
 }

@@ -1,15 +1,15 @@
 package com.example.trackr.feature_settings.ui
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material3.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -50,6 +50,17 @@ fun SettingsScreen(
         )
         Spacer(Modifier.height(24.dp))
 
+        if (userType == UserType.Admin || userType == UserType.Manager) {
+            SectionHeader(title = "Admin Settings")
+
+            SettingsNavItem(
+                title = "SLA Configuration",
+                onClick = { navController.navigate("sla_config") }
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
+
         AccountSection(
             userType = userType,
             onDashboardClick = { type ->
@@ -67,6 +78,33 @@ fun SettingsScreen(
                     popUpTo("main_app") { inclusive = true }
                 }
             }
+        )
+    }
+}
+
+// Simple composable for a clickable settings row
+@Composable
+fun SettingsNavItem(
+    title: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+            contentDescription = null,
+            modifier = Modifier.height(16.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

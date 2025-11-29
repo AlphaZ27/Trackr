@@ -16,9 +16,12 @@ import androidx.navigation.NavController
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,6 +60,8 @@ fun ManagerDashboardScreen(
 
     val suggestedGroups by viewModel.suggestedGroups.collectAsState()
 
+    val qualityMetrics by viewModel.qualityMetrics.collectAsState()
+
     // Ensure lists are unique to prevent crashes
     val uniqueUserActivityList = remember(userActivityList) {
         userActivityList.distinctBy { it.user.id }
@@ -83,6 +88,33 @@ fun ManagerDashboardScreen(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             TicketStatsSection(stats = stats)
+        }
+
+        item {
+            Text(
+                "Quality & Health",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // CSAT Card
+                QualityCard(
+                    title = "CSAT Score",
+                    value = String.format("%.1f", qualityMetrics.averageCsat),
+                    subtext = "${qualityMetrics.csatResponseRate.toInt()}% response rate",
+                    icon = Icons.Default.Star,
+                    modifier = Modifier.weight(1f)
+                )
+                // Reopen Rate Card
+                QualityCard(
+                    title = "Reopen Rate",
+                    value = "${String.format("%.1f", qualityMetrics.reopenRate)}%",
+                    subtext = "Target: < 5%",
+                    icon = Icons.Default.Refresh, // Make sure to import or use a suitable icon
+                    modifier = Modifier.weight(1f),
+                    isGood = qualityMetrics.reopenRate < 5.0
+                )
+            }
         }
 
         // Charts Section
@@ -204,6 +236,32 @@ fun ManagerDashboardScreen(
 //    }
 //    context.startActivity(Intent.createChooser(intent, "Share User Report"))
 //}
+
+
+@Composable
+fun QualityCard(
+    title: String,
+    value: String,
+    subtext: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    isGood: Boolean = true
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = if (isGood) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.errorContainer
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(8.dp))
+            Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(subtext, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
 
 @Composable
 private fun UserPerformanceCard(perf: UserPerformance) {

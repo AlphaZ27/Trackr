@@ -3,6 +3,9 @@ package com.example.trackr.feature_tickets
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,9 +13,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Flag
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.material.icons.filled.ViewStream
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,7 +33,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.trackr.domain.model.Priority
 import com.example.trackr.domain.model.Ticket
+import com.example.trackr.domain.model.TicketGroup
 import com.example.trackr.domain.model.TicketStatus
+import com.example.trackr.feature_manager.TicketGroupCard
 import com.example.trackr.feature_tickets.TicketViewModel
 import com.example.trackr.util.ReportGenerator
 import kotlinx.coroutines.Dispatchers
@@ -49,84 +58,145 @@ fun TicketsScreen(
     val selectedStatus by ticketViewModel.selectedStatus.collectAsState()
     val selectedPriority by ticketViewModel.selectedPriority.collectAsState()
 
+    // Grouping Tickets
+    val ticketGroups by ticketViewModel.ticketGroups.collectAsState() // Grouped tickets
+    val isGroupView by ticketViewModel.isGroupView.collectAsState()   // Toggle state
+
+    // Dialog State
+    val showGroupingDialog by ticketViewModel.showGroupingDialog.collectAsState()
+    val suggestedGroups by ticketViewModel.suggestedGroups.collectAsState()
+
     // For launching the share intent
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val reportGenerator = remember { ReportGenerator() }
 
     Column(modifier = modifier.fillMaxSize()) {
+
+        // Top Tabs for View Switching
+        PrimaryTabRow(
+            selectedTabIndex = if (isGroupView) 1 else 0,
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            Tab(
+                selected = !isGroupView,
+                onClick = { if (isGroupView) ticketViewModel.toggleGroupView() },
+                text = { Text("All Tickets") }
+            )
+            Tab(
+                selected = isGroupView,
+                onClick = { if (!isGroupView) ticketViewModel.toggleGroupView() },
+                text = { Text("Grouped by Issue") }
+            )
+        }
+
         // The filter section with dropdowns
         FilterSection(
             searchQuery = searchQuery,
             selectedStatus = selectedStatus,
             selectedPriority = selectedPriority,
+            isGroupView = isGroupView,
             onQueryChange = ticketViewModel::onSearchQueryChange,
             onStatusChange = ticketViewModel::onStatusSelected,
             onPriorityChange = ticketViewModel::onPrioritySelected,
-            onClearFilters = ticketViewModel::clearFilters
+            onClearFilters = ticketViewModel::clearFilters,
+            onScanClick = { ticketViewModel.scanForSimilarTickets() }
         )
 
-        // Row for "Share Report" button
-//        Row(
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .padding(horizontal = 16.dp, vertical = 8.dp),
-//            verticalAlignment = Alignment.CenterVertically,
-//            horizontalArrangement = Arrangement.End
-//        ) {
-//            OutlinedButton(
-//                onClick = {
-//                    scope.launch {
-//                        val uri = withContext(Dispatchers.IO) {
-//                            reportGenerator.generateTicketReport(context, filteredTickets)
-//                        }
-//                        if (uri != null) {
-//                            shareTicketReport(context, uri)
-//                        }
-//                    }
-//                },
-//                enabled = filteredTickets.isNotEmpty()
-//            ) {
-//                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-//                Spacer(Modifier.width(8.dp))
-//                Text("Share Report")
-//            }
-//        }
 
         // The list of tickets
-        if (filteredTickets.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(if (searchQuery.isNotBlank() || selectedStatus != null || selectedPriority != null) "No tickets match your filters." else "No open tickets found.")
-            }
+        if (!isGroupView && filteredTickets.isEmpty()) {
+            EmptyState("No tickets match your filters.")
+        } else if (isGroupView && ticketGroups.isEmpty()) {
+            EmptyState("No similar ticket groups found (or no open tickets).")
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp), // Space for FAB
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(filteredTickets, key = { it.id }) { ticket ->
-                    // **FIX**: Use TicketCard, not TicketItem
-                    TicketCard(ticket = ticket, onClick = { onTicketClick(ticket.id) })
+                if (isGroupView) {
+                    // Render Groups
+                    items(ticketGroups, key = { it.id }) { group ->
+                        TicketGroupCard(group = group, onTicketClick = onTicketClick)
+                    }
+                } else {
+                    // Render Flat List
+                    items(filteredTickets, key = { it.id }) { ticket ->
+                        TicketCard(ticket = ticket, onClick = { onTicketClick(ticket.id) })
+                    }
                 }
             }
         }
     }
-}
 
-// Helper function to create and start the share intent
-private fun shareTicketReport(context: Context, uri: Uri) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/csv"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        putExtra(Intent.EXTRA_SUBJECT, "Ticket Report")
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    // Grouping Dialog
+    if (showGroupingDialog) {
+        GroupingDialog(
+            suggestions = suggestedGroups,
+            onConfirmGroup = { ticketViewModel.confirmGroup(it) },
+            onDismiss = { ticketViewModel.dismissGroupingDialog() }
+        )
     }
-    context.startActivity(Intent.createChooser(intent, "Share Ticket Report"))
 }
 
+@Composable
+private fun GroupingDialog(
+    suggestions: List<TicketGroup>,
+    onConfirmGroup: (TicketGroup) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Group Similar Tickets") },
+        text = {
+            if (suggestions.isEmpty()) {
+                Text("No new similar tickets found based on current filters.")
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.heightIn(max = 400.dp)
+                ) {
+                    items(suggestions) { group ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(group.title, fontWeight = FontWeight.Bold)
+                                Text("${group.size} tickets found", style = MaterialTheme.typography.bodySmall)
+                                Spacer(Modifier.height(8.dp))
+                                Button(
+                                    onClick = { onConfirmGroup(group) },
+                                    modifier = Modifier.align(Alignment.End)
+                                ) {
+                                    Text("Group These")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
+
+@Composable
+private fun EmptyState(message: String) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -134,23 +204,39 @@ private fun FilterSection(
     searchQuery: String,
     selectedStatus: TicketStatus?,
     selectedPriority: Priority?,
+    isGroupView: Boolean,
     onQueryChange: (String) -> Unit,
     onStatusChange: (TicketStatus?) -> Unit,
     onPriorityChange: (Priority?) -> Unit,
-    onClearFilters: () -> Unit
+    onClearFilters: () -> Unit,
+    onScanClick: () -> Unit
 ) {
     var statusExpanded by remember { mutableStateOf(false) }
     var priorityExpanded by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.padding(16.dp)) {
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = onQueryChange,
-            label = { Text("Search by name, desc, or ID") },
-            shape = RoundedCornerShape(25.dp),
-            modifier = Modifier.fillMaxWidth().testTag("searchField")
-        )
+        // Search Row
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onQueryChange,
+                label = { Text("Search by name, desc, or ID...") },
+                shape = RoundedCornerShape(25.dp),
+                modifier = Modifier.weight(1f).testTag("searchField")
+            )
+            Spacer(Modifier.width(8.dp))
+
+            // Magic Wand Button for Grouping
+            IconButton(
+                onClick = onScanClick,
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                Icon(Icons.Default.AutoFixHigh, contentDescription = "Scan for Groups")
+            }
+        }
         Spacer(Modifier.height(8.dp))
+
+        // Filters Row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -237,6 +323,73 @@ private fun FilterSection(
     }
 }
 
+// Expandable Group Card
+@Composable
+fun TicketGroupCard(
+    group: TicketGroup,
+    onTicketClick: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column {
+            // Group Header (Clickable)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = group.title, // "Issue: Printer ..."
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    Text(
+                        text = "${group.size} similar tickets",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                    )
+                }
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+            }
+
+            // Expanded List of Tickets
+            if (expanded) {
+                Column(
+                    modifier = Modifier
+                        .padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    group.tickets.forEach { ticket ->
+                        TicketCard(ticket = ticket, onClick = { onTicketClick(ticket.id) })
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 @Composable
 fun TicketCard(ticket: Ticket, onClick: () -> Unit) {
@@ -276,11 +429,6 @@ fun TicketCard(ticket: Ticket, onClick: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-//                Text(
-//                    text = ticket.department.uppercase(),
-//                    style = MaterialTheme.typography.bodySmall,
-//                    fontWeight = FontWeight.Bold
-//                )
                 // Small Status Badge
                 Surface(
                     color = statusColor.copy(alpha = 0.1f),

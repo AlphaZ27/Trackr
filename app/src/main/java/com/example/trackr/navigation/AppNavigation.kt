@@ -50,6 +50,7 @@ import com.example.trackr.feature_kb.KBEditScreen
 import com.example.trackr.feature_kb.KBListScreen
 import com.example.trackr.feature_manager.ManagerDashboardScreen
 import com.example.trackr.feature_manager.ManagerDashboardViewModel
+import com.example.trackr.feature_settings.SLAConfigScreen
 import com.example.trackr.feature_settings.ui.SettingsScreen
 import com.example.trackr.feature_settings.domain.model.UserType
 import com.example.trackr.feature_tickets.TicketViewModel
@@ -331,6 +332,12 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
             }
         }
 
+        composable("sla_config") {
+            SLAConfigScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
         // --- Detail screens that navigate on top of the tabs ---
         composable("create_ticket") {
             CreateTicketScreen(
@@ -356,6 +363,9 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToArticle = { articleId ->
                     navController.navigate("kb_detail/$articleId")
+                },
+                onSubmitCsat = { score ->
+                    //ticketViewModel.submitCsatScore(ticketId, score)
                 }
             )
 

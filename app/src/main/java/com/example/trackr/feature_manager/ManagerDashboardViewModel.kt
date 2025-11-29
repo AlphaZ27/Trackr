@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.trackr.domain.model.*
 import com.example.trackr.domain.logic.GroupingEngine
+import com.example.trackr.domain.repository.AnalyticsRepository
 import com.example.trackr.domain.repository.AuthRepository
 import com.example.trackr.domain.repository.DashboardRepository
+import com.example.trackr.domain.repository.QualityMetrics
 import com.example.trackr.domain.repository.TicketRepository
 import com.google.firebase.Timestamp
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +22,8 @@ class ManagerDashboardViewModel @Inject constructor(
     dashboardRepository: DashboardRepository,
     private val ticketRepository: TicketRepository, // Made private to use in fixClosedTimestamps()
     authRepository: AuthRepository,
-    private val groupingEngine: GroupingEngine
+    private val groupingEngine: GroupingEngine,
+    private val analyticsRepository: AnalyticsRepository
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -229,6 +232,10 @@ class ManagerDashboardViewModel @Inject constructor(
         groupingEngine.groupTickets(openTickets)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val qualityMetrics = analyticsRepository.getQualityMetrics()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), QualityMetrics())
+
+    // ** Functions ***
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
     }

@@ -1,30 +1,31 @@
 package com.example.trackr
 
+import android.Manifest
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.platform.LocalContext
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import com.example.trackr.domain.repository.DataStoreRepository
-import com.example.trackr.feature_settings.domain.repository.SettingsRepository
 import com.example.trackr.navigation.AppNavigation
-import com.example.trackr.ui.HomeScreen
 import com.example.trackr.ui.theme.TrackrTheme
+import com.example.trackr.workers.SLAWorker
 import dagger.hilt.android.AndroidEntryPoint
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 // For the darkmode toggle in the settings screen: collect the theme mode Flow as a Compose State
@@ -45,6 +46,16 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var dataStoreRepository: DataStoreRepository
 
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            // Permission granted
+        } else {
+            // Permission denied
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         //enableEdgeToEdge()
@@ -55,6 +66,19 @@ class MainActivity : ComponentActivity() {
                 "dark" -> true
                 "light" -> false
                 else -> isSystemInDarkTheme()
+            }
+
+            val slaRequest = PeriodicWorkRequestBuilder<SLAWorker>(15, TimeUnit.MINUTES)
+                .build()
+
+            WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+                "SLACheck",
+                ExistingPeriodicWorkPolicy.KEEP, // Don't replace if already running
+                slaRequest
+            )
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
 
             TrackrTheme(darkTheme = isDark) {
