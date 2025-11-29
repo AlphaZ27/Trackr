@@ -1,4 +1,6 @@
-# Trackr 🚀
+# Trackr 🚀  
+
+[![Download APK](https://img.shields.io/badge/Download-APK-blue?style=for-the-badge&logo=android)](YOUR_LINK_HERE)
 
 **Trackr** is a modern, feature-rich IT Help Desk and Ticketing application built for Android using **Kotlin** and **Jetpack Compose**. It is designed to streamline support workflows with advanced features like automated SLA monitoring, smart ticket grouping, and comprehensive analytics dashboards.
 
