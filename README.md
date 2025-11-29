@@ -111,4 +111,4 @@ To run instrumentation tests:
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE]((https://opensource.org/license/mit)) file for details.
