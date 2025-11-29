@@ -5,6 +5,7 @@
 ## 📱 Screenshots
 
 | Login Screen | User Dashboard | Grouped Tickets | SLA Configuration |
+
 |<img width="484" height="419" alt="image" src="https://github.com/user-attachments/assets/21a85ca7-a3c6-4106-97dd-f650d8931d9e" />|
 
 
