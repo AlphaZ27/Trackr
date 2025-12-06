@@ -37,7 +37,7 @@ fun SettingsScreen(
     Column(modifier = modifier.fillMaxSize()) {
         SectionHeader(title = "Appearance")
 
-        // 2. Control the ThemeToggleItem with the state from the ViewModel.
+        // Control the ThemeToggleItem with the state from the ViewModel.
         ThemeToggleItem(
             title = "Dark Mode",
             // The toggle is on if the themeMode is "dark".
@@ -56,6 +56,10 @@ fun SettingsScreen(
             SettingsNavItem(
                 title = "SLA Configuration",
                 onClick = { navController.navigate("sla_config") }
+            )
+            SettingsNavItem(
+                title = "Ticket Categories",
+                onClick = { navController.navigate("category_config") }
             )
         }
 

@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 // A hardcoded list of categories for the app
-val ticketCategories = listOf("General", "IT Services", "Hardware", "Software", "OnBoarding", "Networking & VPN")
+//val ticketCategories = listOf("General", "IT Services", "Hardware", "Software", "OnBoarding", "Networking & VPN")
 
 // Helper functions to make the enum names look nice in the UI
 //fun Priority.displayName(): String = this.name
@@ -125,6 +125,7 @@ fun StatusDropdown(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryDropdown(
+    categories: List<String>,
     selectedCategory: String,
     onCategorySelected: (String) -> Unit
 ) {
@@ -138,7 +139,7 @@ fun CategoryDropdown(
             value = selectedCategory,
             onValueChange = {},
             readOnly = true,
-            enabled = false,
+            enabled = false, // Must be false for the dropdown to work nicely with click
             label = { Text("Category") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
@@ -148,13 +149,13 @@ fun CategoryDropdown(
                 disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
             ),
-            modifier = Modifier.menuAnchor(PrimaryNotEditable).fillMaxWidth()
+            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth()
         )
         ExposedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
-            ticketCategories.forEach { category ->
+            categories.forEach { category ->
                 DropdownMenuItem(
                     text = { Text(category) },
                     onClick = {

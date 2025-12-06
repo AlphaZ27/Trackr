@@ -235,6 +235,21 @@ class ManagerDashboardViewModel @Inject constructor(
     val qualityMetrics = analyticsRepository.getQualityMetrics()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), QualityMetrics())
 
+    // Outage Detection Flow (Mass Ticket Creation)
+    // Returns true if > 3 tickets were created in the last 1 hour
+    val outageAlert: StateFlow<Boolean> = _allTickets.map { tickets ->
+        val now = System.currentTimeMillis()
+        val oneHourAgo = now - TimeUnit.HOURS.toMillis(1)
+
+        val recentCount = tickets.count { ticket ->
+            val createdTime = ticket.createdDate.toDate().time
+            createdTime > oneHourAgo
+        }
+
+        // Heuristic: If more than 3 tickets in 1 hour -> Alert
+        recentCount > 3
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     // ** Functions ***
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query

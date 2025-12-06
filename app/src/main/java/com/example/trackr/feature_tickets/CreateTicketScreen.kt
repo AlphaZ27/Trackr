@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -38,6 +39,7 @@ fun CreateTicketScreen(
     val createState by viewModel.createState.collectAsState()
     val potentialDuplicates by viewModel.potentialDuplicates.collectAsState()
     val users by viewModel.users.collectAsState()
+    val categoryList by viewModel.categories.collectAsState()
 
     val context = LocalContext.current
 
@@ -130,6 +132,31 @@ fun CreateTicketScreen(
                 }
             }
 
+            // Smart Assign Row
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    AssigneeDropdown(
+                        allUsers = users,
+                        selectedUser = viewModel.assignee.value,
+                        onUserSelected = { viewModel.assignee.value = it }
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                // The Smart Assign Button
+                IconButton(
+                    onClick = { viewModel.autoAssignBestTechnician() },
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                ) {
+                    Icon(Icons.Default.AutoFixHigh, contentDescription = "Auto Assign Best Available")
+                }
+            }
+
             // Assignee Dropdown
             val users by viewModel.users.collectAsState()
             AssigneeDropdown(
@@ -159,6 +186,7 @@ fun CreateTicketScreen(
 
             // Category Dropdown
             CategoryDropdown(
+                categories = categoryList, // Pass the list
                 selectedCategory = viewModel.category.value,
                 onCategorySelected = { viewModel.category.value = it }
             )

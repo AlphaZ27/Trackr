@@ -29,6 +29,7 @@ fun UpdateTicketScreen(
 ) {
     val updateState by viewModel.updateState.collectAsState()
     val users by viewModel.users.collectAsState()
+    val categoryList by viewModel.categories.collectAsState() // Observe categories
 
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -125,6 +126,7 @@ fun UpdateTicketScreen(
                     .height(120.dp)
             )
             CategoryDropdown(
+                categories = categoryList, // Pass the list
                 selectedCategory = viewModel.category.value,
                 onCategorySelected = { viewModel.category.value = it }
             )

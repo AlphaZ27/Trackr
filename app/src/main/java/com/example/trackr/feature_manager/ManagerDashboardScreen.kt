@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -49,7 +50,6 @@ fun ManagerDashboardScreen(
 ) {
 
     val userActivityList by viewModel.userActivityReport.collectAsState()
-    //val users by viewModel.filteredUsers.collectAsState() // Use filtered users
     val userPerformanceList by viewModel.userPerformanceReport.collectAsState()
     val stats by viewModel.stats.collectAsState()
     val agingStats by viewModel.ticketAgingStats.collectAsState()
@@ -62,6 +62,8 @@ fun ManagerDashboardScreen(
 
     val qualityMetrics by viewModel.qualityMetrics.collectAsState()
 
+    val outageDetected by viewModel.outageAlert.collectAsState()
+
     // Ensure lists are unique to prevent crashes
     val uniqueUserActivityList = remember(userActivityList) {
         userActivityList.distinctBy { it.user.id }
@@ -70,16 +72,45 @@ fun ManagerDashboardScreen(
         userPerformanceList.distinctBy { it.user.id }
     }
 
-    // For launching the share intent
-//    val context = LocalContext.current
-//    val scope = rememberCoroutineScope()
-//    val reportGenerator = remember { ReportGenerator() }
 
     LazyColumn(
         // Apply modifier here
         modifier = modifier.padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+
+        // Outage Banner (Mass Ticket Creation Alert)
+        if (outageDetected) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Warning, contentDescription = null)
+                        Spacer(Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                "Potential Outage or Large Scale Issue Detected",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "High volume of tickets created in the last hour.",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // Top Ticket Summary Cards
         item {
             Text(
@@ -88,6 +119,15 @@ fun ManagerDashboardScreen(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             TicketStatsSection(stats = stats)
+        }
+
+        item {
+            Button(
+                onClick = { navController.navigate("reports_screen") },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+            ) {
+                Text("View Reports Center")
+            }
         }
 
         item {
@@ -154,18 +194,18 @@ fun ManagerDashboardScreen(
         }
 
         // Suggested Groups Section
-        if (suggestedGroups.isNotEmpty()) {
-            item {
-                Text(
-                    "Suggested Ticket Groups",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
-                )
-            }
-            items(suggestedGroups) { group ->
-                TicketGroupCard(group = group, onConfirm = { viewModel.confirmGroup(group) })
-            }
-        }
+//        if (suggestedGroups.isNotEmpty()) {
+//            item {
+//                Text(
+//                    "Suggested Ticket Groups",
+//                    style = MaterialTheme.typography.titleMedium,
+//                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+//                )
+//            }
+//            items(suggestedGroups) { group ->
+//                TicketGroupCard(group = group, onConfirm = { viewModel.confirmGroup(group) })
+//            }
+//        }
 
         // User Performance Section
         if (userPerformanceList.isNotEmpty()) {
@@ -225,18 +265,6 @@ fun ManagerDashboardScreen(
 
     }
 }
-
-// Helper function to create and start the share intent
-//private fun shareReport(context: Context, uri: Uri) {
-//    val intent = Intent(Intent.ACTION_SEND).apply {
-//        type = "text/csv"
-//        putExtra(Intent.EXTRA_STREAM, uri)
-//        putExtra(Intent.EXTRA_SUBJECT, "User Report")
-//        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-//    }
-//    context.startActivity(Intent.createChooser(intent, "Share User Report"))
-//}
-
 
 @Composable
 fun QualityCard(
@@ -345,19 +373,19 @@ private fun UserCard(
     }
 }
 
-@Composable
-fun TicketGroupCard(group: TicketGroup, onConfirm: () -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(group.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Text("${group.size} similar tickets found", style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(8.dp))
-            Button(onClick = onConfirm, modifier = Modifier.align(Alignment.End)) {
-                Text("Group Tickets")
-            }
-        }
-    }
-}
+//@Composable
+//fun TicketGroupCard(group: TicketGroup, onConfirm: () -> Unit) {
+//    Card(
+//        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+//        modifier = Modifier.fillMaxWidth()
+//    ) {
+//        Column(modifier = Modifier.padding(16.dp)) {
+//            Text(group.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+//            Text("${group.size} similar tickets found", style = MaterialTheme.typography.bodyMedium)
+//            Spacer(Modifier.height(8.dp))
+//            Button(onClick = onConfirm, modifier = Modifier.align(Alignment.End)) {
+//                Text("Group Tickets")
+//            }
+//        }
+//    }
+//}

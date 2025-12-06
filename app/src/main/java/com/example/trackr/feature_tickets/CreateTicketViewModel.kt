@@ -12,6 +12,8 @@ import com.example.trackr.domain.repository.KBRepository
 import com.example.trackr.domain.repository.TicketRepository
 import com.example.trackr.domain.model.User
 import com.example.trackr.domain.logic.SimilarityEngine
+import com.example.trackr.domain.model.UserRole
+import com.example.trackr.domain.repository.ConfigurationRepository
 import com.example.trackr.domain.repository.DashboardRepository
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -35,7 +37,8 @@ class CreateTicketViewModel @Inject constructor(
     private val kbRepository: KBRepository,
     private val auth: FirebaseAuth,
     private val dashboardRepository: DashboardRepository,
-    private val similarityEngine: SimilarityEngine
+    private val similarityEngine: SimilarityEngine,
+    configRepository: ConfigurationRepository
 ) : ViewModel() {
 
     val name = mutableStateOf("")
@@ -46,6 +49,11 @@ class CreateTicketViewModel @Inject constructor(
     val priority = mutableStateOf(Priority.Medium)
     val status = mutableStateOf(TicketStatus.Open)
     val category = mutableStateOf("General") // Default value
+
+    val categories: StateFlow<List<String>> = configRepository.getCategories()
+        .map { list -> list.map { it.name } } // Map objects to string names
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
 
     // StateFlow for the list of all users
     val users: StateFlow<List<User>> = dashboardRepository.getAllUsers()
@@ -68,6 +76,10 @@ class CreateTicketViewModel @Inject constructor(
     private val _recentTickets = ticketRepository.getRecentOpenTickets()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Listen to ALL tickets to calculate workload for Smart Assign
+    private val _allTicketsForWorkload = ticketRepository.getAllTicketsForReport()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         // Listen for changes in the description field
         snapshotFlow { description.value }
@@ -75,20 +87,6 @@ class CreateTicketViewModel @Inject constructor(
             .filter { it.isNotBlank() && it.length > 10 } // Only search if description is long enough
             .onEach { desc ->
                 // Use keywords from the description to search
-//                val keywords = desc.split(" ").filter { it.length > 3 }
-//                if (keywords.isNotEmpty()) {
-//                    kbRepository.getAllArticles().collect { articles ->
-//                        _suggestedArticles.value = articles.filter { article ->
-//                            keywords.any { keyword ->
-//                                article.title.contains(keyword, true) ||
-//                                        article.content.contains(keyword, true) ||
-//                                        article.tags.any { it.contains(keyword, true) }
-//                            }
-//                        }
-//                    }
-//                } else {
-//                    _suggestedArticles.value = emptyList()
-//                }
 
                 val articles = _allArticles.value
                 if (articles.isNotEmpty()) {
@@ -111,6 +109,26 @@ class CreateTicketViewModel @Inject constructor(
                 }
             }
             .launchIn(viewModelScope)
+    }
+
+    //  Smart Assignment Logic
+    fun autoAssignBestTechnician() {
+        val candidates = users.value.filter { it.role == UserRole.Manager || it.role == UserRole.User } // Assuming these handle tickets
+        val currentTickets = _allTicketsForWorkload.value.filter {
+            it.status == TicketStatus.Open || it.status == TicketStatus.InProgress
+        }
+
+        // Calculate workload: Map<UserId, Count>
+        val workloadMap = currentTickets.groupBy { it.assignee }.mapValues { it.value.size }
+
+        // Find candidate with minimum workload
+        val bestCandidate = candidates.minByOrNull { user ->
+            workloadMap[user.id] ?: 0 // Default to 0 if they have no tickets
+        }
+
+        if (bestCandidate != null) {
+            assignee.value = bestCandidate
+        }
     }
 
     fun createTicket() {

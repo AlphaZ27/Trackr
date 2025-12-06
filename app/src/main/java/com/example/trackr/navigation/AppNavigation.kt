@@ -253,6 +253,11 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
                 )
             }
         }
+        composable("category_config") {
+            com.example.trackr.feature_admin.CategoryConfigScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
         /* *
         *
         * Manager Dashboard Composable
@@ -294,6 +299,11 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
                     modifier = modifier
                 )
             }
+        }
+        composable("reports_screen") {
+            com.example.trackr.feature_manager.ReportsScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
 
         /*

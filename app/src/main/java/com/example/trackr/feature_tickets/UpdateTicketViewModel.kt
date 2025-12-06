@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.trackr.domain.model.*
+import com.example.trackr.domain.repository.ConfigurationRepository
 import com.example.trackr.domain.repository.DashboardRepository
 import com.example.trackr.domain.repository.TicketRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,7 +25,8 @@ sealed class UpdateState {
 class UpdateTicketViewModel @Inject constructor(
     private val ticketRepository: TicketRepository,
     dashboardRepository: DashboardRepository,
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
+    configRepository: ConfigurationRepository
 ) : ViewModel() {
 
     // --- State for Editable Fields ---
@@ -39,6 +41,10 @@ class UpdateTicketViewModel @Inject constructor(
 
     // --- State for UI ---
     val users: StateFlow<List<User>> = dashboardRepository.getAllUsers()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val categories: StateFlow<List<String>> = configRepository.getCategories()
+        .map { list -> list.map { it.name } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _ticket = MutableStateFlow<Ticket?>(null)
