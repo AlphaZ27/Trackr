@@ -1,14 +1,28 @@
 # Trackr 🚀  
 
-[![Download APK](https://img.shields.io/badge/Download-APK-blue?style=for-the-badge&logo=android)](https://github.com/AlphaZ27/Trackr/releases/latest)
+[![Download APK](https://img.shields.io/badge/Download-APK-blue?style=for-the-badge&logo=android)](https://github.com/AlphaZ27/Trackr/releases/download/v2.0.0/app-release.apk)
 
 **Trackr** is a modern, feature-rich IT Help Desk and Ticketing application built for Android using **Kotlin** and **Jetpack Compose**. It is designed to streamline support workflows with advanced features like automated SLA monitoring, smart ticket grouping, and comprehensive analytics dashboards.
 
 ## 📱 Screenshots
 
-| Login Screen | User Dashboard | Grouped Tickets | SLA Configuration |
 
-|<img width="484" height="419" alt="image" src="https://github.com/user-attachments/assets/21a85ca7-a3c6-4106-97dd-f650d8931d9e" />|
+
+<p float="left">
+  <img width="200" alt="TrackrLogin" src="https://github.com/user-attachments/assets/77fa3a90-a261-4ada-9eba-74175e41a4ef" />
+</p>
+<p float="left">
+  <img width="200" alt="TicketListScreen" src="https://github.com/user-attachments/assets/141e860a-a3dd-4f90-9f0d-4cb73af165b9" />
+  <img width="200" alt="KBListScreen" src="https://github.com/user-attachments/assets/7d535209-d2fa-4e39-a468-5d9340d16e32" />
+
+  <img width="200" alt="GroupedTickets" src="https://github.com/user-attachments/assets/fd9642c9-907d-4ae3-bc3c-dd3cb7f561c1" />
+  <img width="200" alt="Screenshot_20251203_113724 - Reports" src="https://github.com/user-attachments/assets/441b2bc4-586c-411d-8775-7d6a25fc31c3" />
+</p>
+<p float="left">
+  <img width="200" alt="Screenshot_20251203_113251 - Admin" src="https://github.com/user-attachments/assets/59036b5f-5d16-4919-8a86-9a5c4e3b6363" />
+  <img width="200" alt="ManagerDashboard recent" src="https://github.com/user-attachments/assets/5ef3af28-3a97-42a9-b077-78931cc73848" />
+  <img width="200" alt="Screenshot_20251203_113724 - Reports" src="https://github.com/user-attachments/assets/441b2bc4-586c-411d-8775-7d6a25fc31c3" />
+</p>
 
 
 ## ✨ Key Features
