@@ -24,6 +24,7 @@ import com.example.trackr.feature_tickets.ui.shared.CategoryDropdown
 import com.example.trackr.feature_tickets.ui.shared.PriorityDropdown
 import com.example.trackr.feature_tickets.ui.shared.StatusDropdown
 import com.example.trackr.feature_tickets.ui.shared.AssigneeDropdown
+import com.example.trackr.feature_tickets.ui.shared.AssigneeSelector
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -138,14 +139,15 @@ fun CreateTicketScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Box(modifier = Modifier.weight(1f)) {
-                    AssigneeDropdown(
+                    AssigneeSelector(
+                        userRole = viewModel.currentUserRole.value,
+                        currentUserId = viewModel.currentUserId.value,
                         allUsers = users,
                         selectedUser = viewModel.assignee.value,
                         onUserSelected = { viewModel.assignee.value = it }
                     )
                 }
                 Spacer(Modifier.width(8.dp))
-                // The Smart Assign Button
                 IconButton(
                     onClick = { viewModel.autoAssignBestTechnician() },
                     colors = IconButtonDefaults.filledIconButtonColors(
@@ -153,7 +155,7 @@ fun CreateTicketScreen(
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 ) {
-                    Icon(Icons.Default.AutoFixHigh, contentDescription = "Auto Assign Best Available")
+                    Icon(Icons.Default.AutoFixHigh, contentDescription = "Auto Assign")
                 }
             }
 

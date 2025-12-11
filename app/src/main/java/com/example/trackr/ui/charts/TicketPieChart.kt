@@ -36,8 +36,8 @@ import com.github.tehras.charts.piechart.PieChartData
 import com.github.tehras.charts.piechart.renderer.SimpleSliceDrawer
 import com.example.trackr.domain.model.UserCreationStats
 //import com.github.tehras.charts.line.renderer.point.FilledCircularPointDrawer
-//import com.github.tehras.charts.line.renderer.xaxis.SimpleXAxisDrawer as LineSimpleXAxisDrawer
-//import com.github.tehras.charts.line.renderer.yaxis.SimpleYAxisDrawer as LineSimpleYAxisDrawer
+import com.github.tehras.charts.line.renderer.xaxis.SimpleXAxisDrawer as LSimpleXAxisDrawer
+import com.github.tehras.charts.line.renderer.yaxis.SimpleYAxisDrawer as LSimpleYAxisDrawer
 
 
 // Generate a list of colors for the chart
@@ -213,5 +213,23 @@ fun UserCreationLineChart(stats: UserCreationStats) {
             labelTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
             labelValueFormatter = { value -> value.toInt().toString() }
         )
+    )
+}
+
+@Composable
+fun CsatLineChart(data: List<Pair<String, Float>>) {
+    val lineChartData = LineChartData(
+        points = data.map { (label, value) ->
+            LineChartData.Point(value, label)
+        },
+        lineDrawer = SolidLineDrawer(color = Color(0xFF4CAF50)) // Green for Satisfaction
+    )
+
+    LineChart(
+        linesChartData = listOf(lineChartData),
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        pointDrawer = FilledCircularPointDrawer(color = Color(0xFF4CAF50)),
+        xAxisDrawer = LSimpleXAxisDrawer(),
+        yAxisDrawer = LSimpleYAxisDrawer(labelValueFormatter = { "${it.toInt()}★" })
     )
 }

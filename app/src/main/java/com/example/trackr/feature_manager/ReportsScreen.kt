@@ -27,7 +27,7 @@ fun ReportsScreen(
 
     // Helper to launch email intent
     fun sharePdf(uri: Uri) {
-        val intent = Intent(Intent.ACTION_SEND).apply {
+        val intent = Intent(Intent.ACTION_VIEW).apply {
             type = "application/pdf"
             putExtra(Intent.EXTRA_STREAM, uri)
             putExtra(Intent.EXTRA_SUBJECT, "Trackr Report")

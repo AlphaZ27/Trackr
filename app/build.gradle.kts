@@ -17,8 +17,8 @@ android {
         applicationId = "com.example.trackr"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -64,6 +64,9 @@ android {
 }
 
 dependencies {
+
+    // Splash screen
+    implementation("androidx.core:core-splashscreen:1.0.0")
 
     // Simple Light weight charting library
     implementation("com.github.tehras:charts:0.2.4-alpha")
@@ -127,7 +130,8 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation("io.mockk:mockk-android:1.14.6")
-    androidTestImplementation("io.mockk:mockk-android:1.14.6")
+    testImplementation("org.mockito:mockito-core:5.7.0")
+    testImplementation("org.mockito:mockito-inline:5.2.0")
     // Coroutines testing
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     // Hilt Testing

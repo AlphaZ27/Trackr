@@ -61,6 +61,10 @@ fun SettingsScreen(
                 title = "Ticket Categories",
                 onClick = { navController.navigate("category_config") }
             )
+            SettingsNavItem(
+                title = "View Activity Log",
+                onClick = { navController.navigate("activity_log") }
+            )
         }
 
         Spacer(Modifier.height(24.dp))

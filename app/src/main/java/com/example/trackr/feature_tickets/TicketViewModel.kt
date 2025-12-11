@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.trackr.domain.logic.GroupingEngine
 import com.example.trackr.domain.repository.TicketRepository
 import com.example.trackr.domain.model.*
+import com.example.trackr.domain.repository.CsatRepository
+import com.example.trackr.domain.repository.DashboardRepository
 import com.example.trackr.domain.repository.KBRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -24,17 +26,34 @@ sealed class TicketDetailState {
     data class Error(val message: String) : TicketDetailState()
 }
 
+// New Enum for Search Restriction
+enum class SearchField {
+    All, Title, Description, Id, Department
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class TicketViewModel @Inject constructor(
     private val ticketRepository: TicketRepository,
     private val kbRepository: KBRepository,
-    private val groupingEngine: GroupingEngine
+    private val groupingEngine: GroupingEngine,
+    private val csatRepository: CsatRepository,
+    private val dashboardRepository: DashboardRepository
 ) : ViewModel() {
+
+    // -- Tab State --
+    private val _selectedTab = MutableStateFlow(0)
+    val selectedTab = _selectedTab.asStateFlow()
+
 
     // --- State for Ticket List Filtering ---
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
+
+    // Search Field State
+    private val _searchField = MutableStateFlow(SearchField.All)
+    val searchField = _searchField.asStateFlow()
+
     private val _selectedStatus = MutableStateFlow<TicketStatus?>(null)
     val selectedStatus = _selectedStatus.asStateFlow()
     private val _selectedPriority = MutableStateFlow<Priority?>(null)
@@ -44,33 +63,75 @@ class TicketViewModel @Inject constructor(
     private val _tickets = ticketRepository.getAllTickets()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Toggle for Group View
+    // Toggle for Group View (only applies to active tickets)
     private val _isGroupView = MutableStateFlow(false)
     val isGroupView = _isGroupView.asStateFlow()
 
-    val filteredTickets: StateFlow<List<Ticket>> =
-        combine(_tickets, _searchQuery, _selectedStatus, _selectedPriority) { tickets, query, status, priority ->
-            tickets.filter { ticket ->
+    // Helper data class to hold filter values (avoids combine argument limit)
+    private data class FilterCriteria(
+        val tab: Int,
+        val query: String,
+        val field: SearchField,
+        val status: TicketStatus?,
+        val priority: Priority?
+    )
+
+    // User Map for Reports (ID -> Name)
+    val userMap: StateFlow<Map<String, String>> = dashboardRepository.getAllUsers()
+        .map { users -> users.associate { it.id to it.name } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    // Combine filters first, then combine with tickets to avoid the 5-argument limit
+    val filteredTickets: StateFlow<List<Ticket>> = combine(
+        _tickets,
+        combine(_selectedTab, _searchQuery, _searchField, _selectedStatus, _selectedPriority) { tab, query, field, status, priority ->
+            FilterCriteria(tab, query, field, status, priority)
+        }
+    ) { tickets, criteria ->
+        val (tab, query, field, status, priority) = criteria
+
+            // 1. Strict Tab Segregation
+            val tabFiltered = if (tab == 0) {
+                tickets.filter { it.status != TicketStatus.Closed }
+            } else {
+                tickets.filter { it.status == TicketStatus.Closed }
+            }
+
+            // 2. Apply Filters
+            tabFiltered.filter { ticket ->
+                // [Phase 4] Search Field Restriction
                 val queryMatch = if (query.isBlank()) true else {
-                    ticket.name.contains(query, ignoreCase = true) ||
-                            ticket.description.contains(query, ignoreCase = true) ||
-                            ticket.id.contains(query, ignoreCase = true)
+                    when (field) {
+                        SearchField.All -> ticket.name.contains(query, true) ||
+                                ticket.description.contains(query, true) ||
+                                ticket.id.contains(query, true) ||
+                                ticket.department.contains(query, true)
+                        SearchField.Title -> ticket.name.contains(query, true)
+                        SearchField.Description -> ticket.description.contains(query, true)
+                        SearchField.Id -> ticket.id.contains(query, true)
+                        SearchField.Department -> ticket.department.contains(query, true)
+                    }
                 }
+
                 val statusMatch = status == null || ticket.status == status
                 val priorityMatch = priority == null || ticket.priority == priority
                 queryMatch && statusMatch && priorityMatch
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Flow for grouped tickets based on the *filtered* list. Persisted and potential groups.
+
+    // Flow for grouped tickets based on the *filtered* *Active* list. Persisted and potential groups.
     // This means if you search for "Printer", you'll see groups related to printers.
     val ticketGroups: StateFlow<List<TicketGroup>> = filteredTickets.map { tickets ->
-        // Only group open tickets to avoid cluttering with closed ones
-        val openTickets = tickets.filter {
-            it.status == TicketStatus.Open || it.status == TicketStatus.InProgress
+        // We only group tickets if we are in the Active tab.
+        // Grouping closed tickets is rarely useful for incident management.
+        if (_selectedTab.value == 0) {
+            groupingEngine.groupTickets(tickets)
+        } else {
+            emptyList()
         }
-        groupingEngine.groupTickets(openTickets)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
 
     // --- Dialog State for User Grouping ---
     private val _showGroupingDialog = MutableStateFlow(false)
@@ -78,6 +139,7 @@ class TicketViewModel @Inject constructor(
 
     private val _suggestedGroups = MutableStateFlow<List<TicketGroup>>(emptyList())
     val suggestedGroups = _suggestedGroups.asStateFlow()
+
 
     // --- State for Ticket Detail Screen ---
     private val _selectedTicketId = MutableStateFlow<String?>(null)
@@ -139,14 +201,30 @@ class TicketViewModel @Inject constructor(
         loadCurrentUserTickets()
     }
 
+
+    // --- Functions ---
+
+    fun onTabSelected(index: Int) {
+        _selectedTab.value = index
+        // Reset specific filters when switching tabs for a cleaner UX
+        _isGroupView.value = false
+        // We might want to keep search/priority persistence, so not clearing those.
+        if (index == 1) {
+            _selectedStatus.value = null
+        }
+    }
+
+    // Search Field Setter
+    fun onSearchFieldChange(field: SearchField) {
+        _searchField.value = field
+    }
+
     fun loadCurrentUserTickets() {
         viewModelScope.launch {
             // !! Call the new function
             _ticket.value = ticketRepository.getTicketsForCurrentUser()
         }
     }
-
-    // --- Functions ---
 
     // Scan for groups to show in the Dialog
     fun scanForSimilarTickets() {
@@ -189,6 +267,7 @@ class TicketViewModel @Inject constructor(
     fun onSearchQueryChange(query: String) { _searchQuery.value = query }
     fun onStatusSelected(status: TicketStatus?) { _selectedStatus.value = status }
     fun onPrioritySelected(priority: Priority?) { _selectedPriority.value = priority }
+
     fun clearFilters() {
         _searchQuery.value = ""
         _selectedStatus.value = null
@@ -228,15 +307,22 @@ class TicketViewModel @Inject constructor(
         }
     }
 
-    fun submitCsat(ticketId: String, rating: Int) {
+    fun submitCsat(ticketId: String, rating: Int, comment: String, isHelpful: Boolean, technicianId: String) {
         viewModelScope.launch {
-            // Update local state optimisticly if needed, or just wait for firestore
-            val updates = mapOf("csatScore" to rating)
-            // You might want to create a specific update function in Repository, but updateTicket works too if you fetch first
-            // Here we can use a direct firestore patch via repository if exposed,
-            // or just use the existing updateTicket flow:
-            val current = selectedTicket.value ?: return@launch
-            ticketRepository.updateTicket(current.copy(csatScore = rating))
+            val userId = "current_user" // ideally fetch from authRepository.currentUserId
+            val response = CsatResponse(
+                ticketId = ticketId,
+                userId = userId,
+                technicianId = technicianId,
+                rating = rating,
+                comment = comment,
+                isHelpful = isHelpful
+            )
+            csatRepository.submitCsat(response)
+                .onSuccess {
+                    // Refresh ticket to show updated score immediately
+                    getTicketById(ticketId)
+                }
         }
     }
 

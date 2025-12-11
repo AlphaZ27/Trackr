@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.trackr.domain.model.*
+import com.example.trackr.domain.repository.AuthRepository
 import com.example.trackr.domain.repository.ConfigurationRepository
 import com.example.trackr.domain.repository.DashboardRepository
 import com.example.trackr.domain.repository.TicketRepository
@@ -26,7 +27,8 @@ class UpdateTicketViewModel @Inject constructor(
     private val ticketRepository: TicketRepository,
     dashboardRepository: DashboardRepository,
     savedStateHandle: SavedStateHandle,
-    configRepository: ConfigurationRepository
+    configRepository: ConfigurationRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     // --- State for Editable Fields ---
@@ -38,6 +40,10 @@ class UpdateTicketViewModel @Inject constructor(
     val status = mutableStateOf(TicketStatus.Open)
     val category = mutableStateOf("General")
     val assignee = mutableStateOf<User?>(null)
+
+    // User Context
+    val currentUserRole = mutableStateOf(UserRole.User)
+    val currentUserId = mutableStateOf("")
 
     // --- State for UI ---
     val users: StateFlow<List<User>> = dashboardRepository.getAllUsers()
@@ -54,6 +60,16 @@ class UpdateTicketViewModel @Inject constructor(
     private val ticketId: String = savedStateHandle.get<String>("ticketId")!!
 
     init {
+
+        // Load User Role
+        viewModelScope.launch {
+            val user = authRepository.getCurrentUserData()
+            user?.let {
+                currentUserRole.value = it.role
+                currentUserId.value = it.id
+            }
+        }
+
         if (ticketId.isNotBlank()) {
             viewModelScope.launch {
                 // Combine the ticket and user flows
@@ -82,6 +98,15 @@ class UpdateTicketViewModel @Inject constructor(
         val currentTicket = _ticket.value ?: return
         viewModelScope.launch {
             _updateState.value = UpdateState.Loading
+
+            // History Logic
+            val newAssigneeId = assignee.value?.id ?: ""
+            val newHistory = if (newAssigneeId.isNotBlank() && newAssigneeId != currentTicket.assignee) {
+                currentTicket.technicianHistory + newAssigneeId
+            } else {
+                currentTicket.technicianHistory
+            }
+
             val updatedTicket = currentTicket.copy(
                 name = name.value,
                 description = description.value,
@@ -90,7 +115,8 @@ class UpdateTicketViewModel @Inject constructor(
                 priority = priority.value,
                 status = status.value,
                 category = category.value,
-                assignee = assignee.value?.id ?: "" // Save the ID
+                assignee = assignee.value?.id ?: "", // Save the ID
+                technicianHistory = newHistory // Save History
             )
             ticketRepository.updateTicket(updatedTicket)
                 .onSuccess { _updateState.value = UpdateState.Success }

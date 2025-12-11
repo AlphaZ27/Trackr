@@ -3,6 +3,7 @@ package com.example.trackr.feature_admin.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.trackr.domain.model.*
+import com.example.trackr.domain.repository.AdminDashboardRepository
 import com.example.trackr.domain.repository.DashboardRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,7 +17,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AdminDashboardViewModel @Inject constructor(
-    private val dashboardRepository: DashboardRepository
+    private val adminRepository: AdminDashboardRepository
 ) : ViewModel() {
 
     // State for the user search query
@@ -28,7 +29,7 @@ class AdminDashboardViewModel @Inject constructor(
     val selectedRole = _selectedRole.asStateFlow()
 
     // A real-time flow of ALL users.
-    val users: StateFlow<List<User>> = dashboardRepository.getAllUsers()
+    val users: StateFlow<List<User>> = adminRepository.getAllUsers()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -67,7 +68,7 @@ class AdminDashboardViewModel @Inject constructor(
 
 
     // A real-time flow of the ticket statistics.
-    val stats: StateFlow<DashboardStats> = dashboardRepository.getTicketStats()
+    val stats: StateFlow<DashboardStats> = adminRepository.getTicketStats()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -75,7 +76,7 @@ class AdminDashboardViewModel @Inject constructor(
         )
 
     // User role stats
-    val userRoleStats: StateFlow<UserRoleStats> = dashboardRepository.getUserRoleStats()
+    val userRoleStats: StateFlow<UserRoleStats> = adminRepository.getUserRoleStats()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -83,7 +84,7 @@ class AdminDashboardViewModel @Inject constructor(
         )
 
     // Ticket category stats
-    val categoryStats: StateFlow<List<CategoryStat>> = dashboardRepository.getTicketCategoryStats()
+    val categoryStats: StateFlow<List<CategoryStat>> = adminRepository.getTicketCategoryStats()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -91,7 +92,7 @@ class AdminDashboardViewModel @Inject constructor(
         )
 
     // Ticket resolution time stats
-    val resolutionTimeStats: StateFlow<ResolutionTimeStats> = dashboardRepository.getTicketResolutionStats()
+    val resolutionTimeStats: StateFlow<ResolutionTimeStats> = adminRepository.getTicketResolutionStats()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -134,7 +135,7 @@ class AdminDashboardViewModel @Inject constructor(
     // Function to update a user's role.
     fun updateUserRole(userId: String, newRole: UserRole) {
         viewModelScope.launch {
-            dashboardRepository.updateUserRole(userId, newRole)
+            adminRepository.updateUserRole(userId, newRole)
                 // Error handling can be added here (e.g., updating a UI state for a snackbar)
                 .onFailure { /* Handle error */ }
         }
@@ -143,8 +144,13 @@ class AdminDashboardViewModel @Inject constructor(
     // Function to deactivate a user
     fun deactivateUser(userId: String) {
         viewModelScope.launch {
-            dashboardRepository.updateUserStatus(userId, UserStatus.Deactivated)
+            adminRepository.updateUserStatus(userId, UserStatus.Deactivated)
                 .onFailure { /* Handle error */ }
+        }
+    }
+    fun reactivateUser(userId: String) {
+        viewModelScope.launch {
+            adminRepository.updateUserStatus(userId, UserStatus.Active)
         }
     }
 }

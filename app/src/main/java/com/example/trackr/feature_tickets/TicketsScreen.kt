@@ -13,10 +13,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.ViewStream
@@ -54,11 +56,13 @@ fun TicketsScreen(
     // Observe all the necessary state from the ViewModel
     val filteredTickets by ticketViewModel.filteredTickets.collectAsState()
     val searchQuery by ticketViewModel.searchQuery.collectAsState()
+    val searchField by ticketViewModel.searchField.collectAsState()
     val selectedStatus by ticketViewModel.selectedStatus.collectAsState()
     val selectedPriority by ticketViewModel.selectedPriority.collectAsState()
 
     // Grouping Tickets
     val ticketGroups by ticketViewModel.ticketGroups.collectAsState() // Grouped tickets
+    val selectedTab by ticketViewModel.selectedTab.collectAsState() // 0 = Active, 1 = Closed
     val isGroupView by ticketViewModel.isGroupView.collectAsState()   // Toggle state
 
     // Dialog State
@@ -74,53 +78,60 @@ fun TicketsScreen(
 
         // Top Tabs for View Switching
         PrimaryTabRow(
-            selectedTabIndex = if (isGroupView) 1 else 0,
+            selectedTabIndex = selectedTab,
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             Tab(
-                selected = !isGroupView,
-                onClick = { if (isGroupView) ticketViewModel.toggleGroupView() },
-                text = { Text("All Tickets") }
+                selected = selectedTab == 0,
+                onClick = { ticketViewModel.onTabSelected(0) },
+                text = { Text("Active Tickets") }
             )
             Tab(
-                selected = isGroupView,
-                onClick = { if (!isGroupView) ticketViewModel.toggleGroupView() },
-                text = { Text("Grouped by Issue") }
+                selected = selectedTab == 1,
+                onClick = { ticketViewModel.onTabSelected(1) },
+                text = { Text("Closed History") }
             )
         }
 
         // The filter section with dropdowns
         FilterSection(
             searchQuery = searchQuery,
+            searchField = searchField,
             selectedStatus = selectedStatus,
             selectedPriority = selectedPriority,
+            currentTab = selectedTab, //Pass tab to decide which buttons to show
             isGroupView = isGroupView,
             onQueryChange = ticketViewModel::onSearchQueryChange,
+            onSearchFieldChange = ticketViewModel::onSearchFieldChange,
             onStatusChange = ticketViewModel::onStatusSelected,
             onPriorityChange = ticketViewModel::onPrioritySelected,
             onClearFilters = ticketViewModel::clearFilters,
-            onScanClick = { ticketViewModel.scanForSimilarTickets() }
+            onScanClick = { ticketViewModel.scanForSimilarTickets() },
+            onToggleView = ticketViewModel::toggleGroupView
         )
 
 
         // The list of tickets
-        if (!isGroupView && filteredTickets.isEmpty()) {
-            EmptyState("No tickets match your filters.")
-        } else if (isGroupView && ticketGroups.isEmpty()) {
-            EmptyState("No similar ticket groups found (or no open tickets).")
+        if (filteredTickets.isEmpty()) {
+            val emptyMsg = if (selectedTab == 0) "No active tickets found." else "No closed tickets found."
+            EmptyState(emptyMsg)
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp), // Space for FAB
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (isGroupView) {
-                    // Render Groups
-                    items(ticketGroups, key = { it.id }) { group ->
-                        TicketGroupCard(group = group, onTicketClick = onTicketClick)
+                // If Active Tab AND Group View is enabled
+                if (selectedTab == 0 && isGroupView) {
+                    if (ticketGroups.isEmpty()) {
+                        item { EmptyState("No groupings found.") }
+                    } else {
+                        items(ticketGroups, key = { it.id }) { group ->
+                            TicketGroupCard(group = group, onTicketClick = onTicketClick)
+                        }
                     }
                 } else {
-                    // Render Flat List
+                    // Standard List View (Active or Closed)
                     items(filteredTickets, key = { it.id }) { ticket ->
                         TicketCard(ticket = ticket, onClick = { onTicketClick(ticket.id) })
                     }
@@ -201,60 +212,117 @@ private fun EmptyState(message: String) {
 @Composable
 private fun FilterSection(
     searchQuery: String,
+    searchField: SearchField,
     selectedStatus: TicketStatus?,
     selectedPriority: Priority?,
+    currentTab: Int,
     isGroupView: Boolean,
     onQueryChange: (String) -> Unit,
+    onSearchFieldChange: (SearchField) -> Unit,
     onStatusChange: (TicketStatus?) -> Unit,
     onPriorityChange: (Priority?) -> Unit,
     onClearFilters: () -> Unit,
-    onScanClick: () -> Unit
+    onScanClick: () -> Unit,
+    onToggleView: () -> Unit
 ) {
     var statusExpanded by remember { mutableStateOf(false) }
     var priorityExpanded by remember { mutableStateOf(false) }
+    var searchFieldExpanded by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.padding(16.dp)) {
-        // Search Row
+        // Search
         Row(verticalAlignment = Alignment.CenterVertically) {
+
+            // [Phase 4] Search By Dropdown (Compact)
+            Box {
+                IconButton(onClick = { searchFieldExpanded = true }) {
+                    Icon(
+                        imageVector = Icons.Default.FilterList,
+                        contentDescription = "Search Filter",
+                        tint = if (searchField != SearchField.All) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                DropdownMenu(
+                    expanded = searchFieldExpanded,
+                    onDismissRequest = { searchFieldExpanded = false }
+                ) {
+                    SearchField.values().forEach { field ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = field.name,
+                                    fontWeight = if (field == searchField) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            onClick = {
+                                onSearchFieldChange(field)
+                                searchFieldExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onQueryChange,
-                label = { Text("Search by name, desc, or ID...") },
+                label = { Text("Search by ${searchField.name}") }, // Dynamic label based on searchField
                 shape = RoundedCornerShape(25.dp),
-                modifier = Modifier.weight(1f).testTag("searchField")
+                modifier = Modifier.weight(1f).testTag("searchField"),
+                singleLine = true
             )
-            Spacer(Modifier.width(8.dp))
 
-            // Magic Wand Button for Grouping
-            IconButton(
-                onClick = onScanClick,
-                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-            ) {
-                Icon(Icons.Default.AutoFixHigh, contentDescription = "Scan for Groups")
+            // Only show Magic Wand and View Toggle if we are in "Active" tab (0)
+            if (currentTab == 0) {
+                Spacer(Modifier.width(8.dp))
+                // View Toggle (List vs Group)
+                IconButton(
+                    onClick = onToggleView,
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = if (isGroupView) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Icon(
+                        imageVector = if (isGroupView) Icons.Default.ViewStream else Icons.AutoMirrored.Filled.ViewList,
+                        contentDescription = "Toggle View"
+                    )
+                }
+
+                Spacer(Modifier.width(4.dp))
+
+                // Scan Button
+                IconButton(
+                    onClick = onScanClick,
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Icon(Icons.Default.AutoFixHigh, contentDescription = "Scan for Groups")
+                }
             }
         }
+
         Spacer(Modifier.height(8.dp))
 
-        // Filters Row
+        // Row 2: Status, Priority and Clear Filters
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Status Filter Dropdown
+            // Status Dropdown
             ExposedDropdownMenuBox(
                 expanded = statusExpanded,
                 onExpandedChange = { statusExpanded = !statusExpanded },
                 modifier = Modifier.weight(1f)
             ) {
                 OutlinedTextField(
-                    value = selectedStatus?.name ?: "All Statuses",
+                    value = selectedStatus?.name ?: "All Status",
                     onValueChange = {},
                     readOnly = true,
                     enabled = false,
-                    label = { Text("Status") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = statusExpanded) },
-                    shape = RoundedCornerShape(25.dp),
+                    shape = RoundedCornerShape(15.dp),
+                    maxLines = 1,
+                    singleLine = true,
                     colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
                         disabledTextColor = MaterialTheme.colorScheme.onSurface,
                         disabledBorderColor = MaterialTheme.colorScheme.outline,
@@ -269,16 +337,16 @@ private fun FilterSection(
                     onDismissRequest = { statusExpanded = false }
                 ) {
                     DropdownMenuItem(text = { Text("All Statuses") }, onClick = { onStatusChange(null); statusExpanded = false })
-                    TicketStatus.values().forEach { status ->
-                        DropdownMenuItem(
-                            text = { Text(status.name) },
-                            onClick = { onStatusChange(status); statusExpanded = false }
-                        )
+
+                    // Filter dropdown options based on tab
+                    // Optional: You could hide "Closed" option if in Active tab, but filtering logic in VM handles it safely.
+                    TicketStatus.entries.forEach { status ->
+                        DropdownMenuItem(text = { Text(status.name) }, onClick = { onStatusChange(status); statusExpanded = false })
                     }
                 }
             }
 
-            // Priority Filter Dropdown
+            // Priority Dropdown
             ExposedDropdownMenuBox(
                 expanded = priorityExpanded,
                 onExpandedChange = { priorityExpanded = !priorityExpanded },
@@ -289,9 +357,10 @@ private fun FilterSection(
                     onValueChange = {},
                     readOnly = true,
                     enabled = false,
-                    label = { Text("Priority") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = priorityExpanded) },
-                    shape = RoundedCornerShape(25.dp),
+                    shape = RoundedCornerShape(15.dp),
+                    maxLines = 1,
+                    singleLine = true,
                     colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
                         disabledTextColor = MaterialTheme.colorScheme.onSurface,
                         disabledBorderColor = MaterialTheme.colorScheme.outline,
@@ -307,10 +376,7 @@ private fun FilterSection(
                 ) {
                     DropdownMenuItem(text = { Text("All Priorities") }, onClick = { onPriorityChange(null); priorityExpanded = false })
                     Priority.entries.forEach { priority ->
-                        DropdownMenuItem(
-                            text = { Text(priority.name) },
-                            onClick = { onPriorityChange(priority); priorityExpanded = false }
-                        )
+                        DropdownMenuItem(text = { Text(priority.name) }, onClick = { onPriorityChange(priority); priorityExpanded = false })
                     }
                 }
             }

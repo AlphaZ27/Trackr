@@ -30,7 +30,10 @@ data class Ticket(
     val resolutionDescription: String = "",
     val createdBy: String = "",
     val category: String = "General", // Default to "General" if not specified
-    val closedAt: Timestamp? = null, // This allows the value to be null if the ticket is still open
+    val closedDate: Timestamp? = null, // This allows the value to be null if the ticket is still open
+
+    //val closedDate: Timestamp? = null, // This allows the value to be null if the ticket is still open
+    val closedBy: String? = null, // User ID of the person who closed the ticket
 
 
     val linkedArticles: List<String> = emptyList(),  // List is empty by default to avoid nulls/crashes if there are no linked articles in tickets

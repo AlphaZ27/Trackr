@@ -17,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -31,6 +32,7 @@ import com.example.trackr.ui.HomeScreen
 import com.example.trackr.util.ReportGenerator
 import com.example.trackr.domain.model.CategoryStat
 import com.example.trackr.domain.model.ResolutionTimeStats
+import com.example.trackr.domain.model.UserStatus
 import com.example.trackr.ui.charts.TicketPieChart
 import com.example.trackr.ui.charts.UserCreationLineChart
 import java.text.DecimalFormat
@@ -45,6 +47,7 @@ fun AdminDashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val users by viewModel.filteredUsers.collectAsState() // Use filtered users
+    val filteredUsers by viewModel.filteredUsers.collectAsState()
     val stats by viewModel.stats.collectAsState()
     val userStats by viewModel.userRoleStats.collectAsState()
     val categoryStats by viewModel.categoryStats.collectAsState()
@@ -56,10 +59,6 @@ fun AdminDashboardScreen(
 
     var userToDeactivate by remember { mutableStateOf<User?>(null) }
 
-    // For launching the share intent
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val reportGenerator = remember { ReportGenerator() }
 
     LazyColumn(
         modifier = modifier.padding(16.dp),
@@ -195,24 +194,39 @@ fun AdminDashboardScreen(
             }
         }
 
-        if (users.isEmpty()) {
-            item {
-                Text(
-                    "No users found.",
-                    modifier = Modifier.padding(top = 16.dp)
-                )
-            }
+        if (filteredUsers.isEmpty()) {
+            item { Text("No users found.") }
         } else {
-            items(users, key = { it.id }) { user ->
-                UserRoleCard(
+            items(filteredUsers, key = { it.id }) { user ->
+                UserManagementItem(
                     user = user,
-                    onRoleChange = { newRole ->
-                        viewModel.updateUserRole(user.id, newRole)
-                    },
-                    onDeactivate = { userToDeactivate = user }
+                    onRoleChange = { newRole -> viewModel.updateUserRole(user.id, newRole) },
+                    onStatusToggle = {
+                        if (user.status == UserStatus.Active) viewModel.deactivateUser(user.id)
+                        else viewModel.reactivateUser(user.id)
+                    }
                 )
             }
         }
+
+//        if (users.isEmpty()) {
+//            item {
+//                Text(
+//                    "No users found.",
+//                    modifier = Modifier.padding(top = 16.dp)
+//                )
+//            }
+//        } else {
+//            items(users, key = { it.id }) { user ->
+//                UserRoleCard(
+//                    user = user,
+//                    onRoleChange = { newRole ->
+//                        viewModel.updateUserRole(user.id, newRole)
+//                    },
+//                    onDeactivate = { userToDeactivate = user }
+//                )
+//            }
+//        }
     }
     // Confirmation dialog for deactivation
     if (userToDeactivate != null) {
@@ -233,6 +247,57 @@ fun AdminDashboardScreen(
                 TextButton(onClick = { userToDeactivate = null }) { Text("Cancel") }
             }
         )
+    }
+}
+
+@Composable
+fun UserManagementItem(
+    user: User,
+    onRoleChange: (UserRole) -> Unit,
+    onStatusToggle: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(user.name, style = MaterialTheme.typography.titleSmall)
+                Text(user.email, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    text = if (user.status == UserStatus.Active) "Active" else "Deactivated",
+                    color = if (user.status == UserStatus.Active) Color(0xFF4CAF50) else Color.Red,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+
+            // Role Dropdown
+            Box {
+                TextButton(onClick = { expanded = true }) {
+                    Text(user.role.name)
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    UserRole.values().forEach { role ->
+                        DropdownMenuItem(
+                            text = { Text(role.name) },
+                            onClick = {
+                                onRoleChange(role)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Status Toggle
+            Switch(
+                checked = user.status == UserStatus.Active,
+                onCheckedChange = { onStatusToggle() }
+            )
+        }
     }
 }
 

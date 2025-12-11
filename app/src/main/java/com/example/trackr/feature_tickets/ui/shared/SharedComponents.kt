@@ -1,6 +1,7 @@
 package com.example.trackr.feature_tickets.ui.shared
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
@@ -12,9 +13,11 @@ import com.example.trackr.domain.model.TicketStatus
 import com.example.trackr.domain.model.User
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.trackr.domain.model.UserRole
 
 // A hardcoded list of categories for the app
 //val ticketCategories = listOf("General", "IT Services", "Hardware", "Software", "OnBoarding", "Networking & VPN")
@@ -300,5 +303,108 @@ fun TicketDetailCard(
                 }
             )
         }
+    }
+}
+
+// Smart Assignment Component
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AssigneeSelector(
+    userRole: UserRole,
+    currentUserId: String,
+    allUsers: List<User>,
+    selectedUser: User?,
+    onUserSelected: (User?) -> Unit
+) {
+    // 1. Admin/Manager: Show Full Dropdown
+    if (userRole == UserRole.Admin || userRole == UserRole.Manager) {
+        var expanded by remember { mutableStateOf(false) }
+
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded }
+        ) {
+            OutlinedTextField(
+                value = selectedUser?.name ?: "Unassigned",
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Assignee") },
+                trailingIcon = {
+                    if (selectedUser != null) {
+                        IconButton(onClick = { onUserSelected(null) }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                        }
+                    } else {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                    }
+                },
+                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
+                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                    disabledBorderColor = MaterialTheme.colorScheme.outline,
+                    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+                modifier = Modifier
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                    .fillMaxWidth()
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Unassigned") },
+                    onClick = {
+                        onUserSelected(null)
+                        expanded = false
+                    }
+                )
+                allUsers.forEach { user ->
+                    DropdownMenuItem(
+                        text = { Text(user.name) },
+                        onClick = {
+                            onUserSelected(user)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+    //  Standard User: Show "Assign to Me" Button
+    else {
+        val isAssignedToMe = selectedUser?.id == currentUserId
+
+        OutlinedTextField(
+            value = if (isAssignedToMe) "Assigned to You" else (selectedUser?.name ?: "Unassigned"),
+            onValueChange = {},
+            readOnly = true,
+            enabled = false, // Disabled text field, controlled by button
+            label = { Text("Assignee") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
+                disabledTextColor = if (isAssignedToMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            trailingIcon = {
+                if (!isAssignedToMe) {
+                    Button(
+                        onClick = {
+                            // Find self in list or create dummy user object with ID
+                            val self = allUsers.find { it.id == currentUserId } ?: User(id = currentUserId, name = "Me")
+                            onUserSelected(self)
+                        },
+                        modifier = Modifier.padding(end = 8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        enabled = true
+                    ) {
+                        Text("Assign to Me", style = MaterialTheme.typography.labelSmall)
+                    }
+                } else {
+                    Icon(Icons.Default.Person, contentDescription = "You", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        )
     }
 }

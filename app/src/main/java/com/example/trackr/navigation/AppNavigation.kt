@@ -145,14 +145,33 @@ private fun NavGraphBuilder.splashScreen(navController: NavController) {
 }
 
 // The Share Report function is now defined here because I want it to be a FAB
-private fun shareReport(context: Context, uri: Uri, subject: String) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/csv"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        putExtra(Intent.EXTRA_SUBJECT, subject)
+//private fun shareReport(context: Context, uri: Uri, subject: String) {
+//    val intent = Intent(Intent.ACTION_SEND).apply {
+//        // Correct MIME type for PDF
+//        type = "application/pdf"
+//        putExtra(Intent.EXTRA_STREAM, uri)
+//        putExtra(Intent.EXTRA_SUBJECT, subject)
+//        putExtra(Intent.EXTRA_TEXT, "Here is the generated $subject.")
+//        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+//    }
+//    // Launch the chooser
+//    context.startActivity(Intent.createChooser(intent, "Share Report via..."))
+//}
+
+private fun viewReport(context: Context, uri: Uri) {
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "application/pdf")
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
     }
-    context.startActivity(Intent.createChooser(intent, "Share Report"))
+    // Verify there is an app to open it
+    val chooser = Intent.createChooser(intent, "Open Report")
+    try {
+        context.startActivity(chooser)
+    } catch (e: Exception) {
+        // Fallback or Toast "No PDF viewer found"
+        e.printStackTrace()
+    }
 }
 
 private fun NavGraphBuilder.mainGraph(navController: NavController) {
@@ -163,6 +182,7 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
             // Hoist the ViewModel and state here to control the FAB
             val ticketViewModel: TicketViewModel = hiltViewModel()
             val tickets by ticketViewModel.filteredTickets.collectAsState()
+            val userMap by ticketViewModel.userMap.collectAsState()
             val context = LocalContext.current
             val scope = rememberCoroutineScope()
             val reportGenerator = remember { ReportGenerator() }
@@ -173,6 +193,7 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
                 floatingActionButton = {
                     TicketScreenFABs(
                         tickets = tickets,
+                        userMap = userMap,
                         reportGenerator = reportGenerator,
                         context = context,
                         onNavigateToCreate = { navController.navigate("create_ticket") }
@@ -236,7 +257,7 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
                                         reportGenerator.generateUserReport(context, users)
                                     }
                                     if (uri != null) {
-                                        shareReport(context, uri, "Admin User Report")
+                                        viewReport(context, uri)
                                     }
                                 }
                             }
@@ -255,6 +276,11 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
         }
         composable("category_config") {
             com.example.trackr.feature_admin.CategoryConfigScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable("activity_log") {
+            com.example.trackr.feature_admin.ActivityLogScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
@@ -283,7 +309,7 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
                                         reportGenerator.generateUserReport(context, users.map { it.user })
                                     }
                                     if (uri != null) {
-                                        shareReport(context, uri, "Manager User Report")
+                                        viewReport(context, uri)
                                     }
                                 }
                             }
@@ -294,6 +320,7 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
                 }
             ) { modifier ->
                 ManagerDashboardScreen(
+                    onNavigateBack = { navController.popBackStack() },
                     viewModel = managerViewModel,
                     navController = navController,
                     modifier = modifier
@@ -316,6 +343,7 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
             // "User" dashboard is the same as the "Tickets" route
             val ticketViewModel: TicketViewModel = hiltViewModel()
             val tickets by ticketViewModel.filteredTickets.collectAsState()
+            val userMap by ticketViewModel.userMap.collectAsState()
             val context = LocalContext.current
             val scope = rememberCoroutineScope()
             val reportGenerator = remember { ReportGenerator() }
@@ -326,6 +354,7 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
                 floatingActionButton = {
                     TicketScreenFABs(
                         tickets = tickets,
+                        userMap = userMap,
                         reportGenerator = reportGenerator,
                         context = context,
                         onNavigateToCreate = { navController.navigate("create_ticket") }
@@ -424,6 +453,7 @@ private fun NavGraphBuilder.mainGraph(navController: NavController) {
 @Composable
 private fun TicketScreenFABs(
     tickets: List<Ticket>,
+    userMap: Map<String, String>,
     reportGenerator: ReportGenerator,
     context: Context,
     onNavigateToCreate: () -> Unit
@@ -439,10 +469,10 @@ private fun TicketScreenFABs(
             onClick = {
                 scope.launch {
                     val uri = withContext(Dispatchers.IO) {
-                        reportGenerator.generateTicketReport(context, tickets)
+                        reportGenerator.generateTicketReport(context, tickets, userMap)
                     }
                     if (uri != null) {
-                        shareReport(context, uri, "Ticket Report")
+                        viewReport(context, uri)
                     }
                 }
             },
@@ -450,7 +480,7 @@ private fun TicketScreenFABs(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
         ) {
-            Icon(Icons.Default.Share, contentDescription = "Share Report")
+            Icon(Icons.Default.Share, contentDescription = "Generate Report")
         }
 
         // Create Ticket FAB (Primary)

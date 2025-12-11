@@ -13,6 +13,7 @@ import com.example.trackr.domain.repository.TicketRepository
 import com.example.trackr.domain.model.User
 import com.example.trackr.domain.logic.SimilarityEngine
 import com.example.trackr.domain.model.UserRole
+import com.example.trackr.domain.repository.AuthRepository
 import com.example.trackr.domain.repository.ConfigurationRepository
 import com.example.trackr.domain.repository.DashboardRepository
 import com.google.firebase.auth.FirebaseAuth
@@ -38,7 +39,8 @@ class CreateTicketViewModel @Inject constructor(
     private val auth: FirebaseAuth,
     private val dashboardRepository: DashboardRepository,
     private val similarityEngine: SimilarityEngine,
-    configRepository: ConfigurationRepository
+    configRepository: ConfigurationRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     val name = mutableStateOf("")
@@ -49,6 +51,10 @@ class CreateTicketViewModel @Inject constructor(
     val priority = mutableStateOf(Priority.Medium)
     val status = mutableStateOf(TicketStatus.Open)
     val category = mutableStateOf("General") // Default value
+
+    // User Context
+    val currentUserRole = mutableStateOf(UserRole.User)
+    val currentUserId = mutableStateOf("")
 
     val categories: StateFlow<List<String>> = configRepository.getCategories()
         .map { list -> list.map { it.name } } // Map objects to string names
@@ -81,6 +87,16 @@ class CreateTicketViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
+
+        // Load User Role
+        viewModelScope.launch {
+            val user = authRepository.getCurrentUserData()
+            user?.let {
+                currentUserRole.value = it.role
+                currentUserId.value = it.id
+            }
+        }
+
         // Listen for changes in the description field
         snapshotFlow { description.value }
             .debounce(500) // Wait for 500ms of no typing
@@ -134,6 +150,7 @@ class CreateTicketViewModel @Inject constructor(
     fun createTicket() {
         viewModelScope.launch {
             _createState.value = CreateState.Loading
+            val assigneeId = assignee.value?.id ?: ""
             val newTicket = Ticket(
                 name = name.value,
                 description = description.value,
@@ -143,7 +160,8 @@ class CreateTicketViewModel @Inject constructor(
                 priority = priority.value,
                 status = status.value,
                 createdBy = auth.currentUser?.uid ?: "unknown", // Use the current user's ID or default to "unknown"
-                category = category.value
+                category = category.value,
+                technicianHistory = if (assigneeId.isNotBlank()) listOf(assigneeId) else emptyList()
             )
             ticketRepository.createTicket(newTicket)
                 .onSuccess { _createState.value = CreateState.Success }

@@ -17,6 +17,7 @@ data class KBArticle(
 //    val attachments: List<String> = emptyList(), // Can add this in a later phase
     val status: ArticleStatus = ArticleStatus.Draft,
     val authorId: String = "",
+    val createdBy: String = "",
     val reviewerId: String? = null,
     @ServerTimestamp val lastUpdated: Timestamp? = null,
 

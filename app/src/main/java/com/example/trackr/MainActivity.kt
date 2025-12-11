@@ -1,9 +1,13 @@
 package com.example.trackr
 
+import android.animation.ObjectAnimator
 import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.View
+import android.view.animation.OvershootInterpolator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,6 +20,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.animation.doOnEnd
+import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -46,6 +53,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var dataStoreRepository: DataStoreRepository
 
+    //private val splashScreen = installSplashScreen()
+
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -57,9 +67,48 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+
+        val splashScreen = installSplashScreen()
+
         super.onCreate(savedInstanceState)
         //enableEdgeToEdge()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val permissionStatus = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            )
+
+            if (permissionStatus != PackageManager.PERMISSION_GRANTED) {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        splashScreen.setOnExitAnimationListener { splashScreenViewProvider ->
+            val iconView = splashScreenViewProvider.iconView
+
+            // Scale down animation
+            val scaleX = ObjectAnimator.ofFloat(iconView, View.SCALE_X, 1f, 0f)
+            val scaleY = ObjectAnimator.ofFloat(iconView, View.SCALE_Y, 1f, 0f)
+            val fade = ObjectAnimator.ofFloat(iconView, View.ALPHA, 1f, 0f)
+
+            scaleX.interpolator = OvershootInterpolator()
+            scaleX.duration = 500L
+            scaleY.interpolator = OvershootInterpolator()
+            scaleY.duration = 500L
+            fade.duration = 300L
+
+            scaleX.start()
+            scaleY.start()
+            fade.start()
+
+            // Remove splash screen when animation ends
+            scaleX.doOnEnd {
+                splashScreenViewProvider.remove()
+            }
+        }
         setContent {
+
             val themeMode by dataStoreRepository.getTheme().collectAsState(initial = "light")
 
             val isDark = when (themeMode) {
@@ -76,10 +125,6 @@ class MainActivity : ComponentActivity() {
                 ExistingPeriodicWorkPolicy.KEEP, // Don't replace if already running
                 slaRequest
             )
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
 
             TrackrTheme(darkTheme = isDark) {
                 Surface(

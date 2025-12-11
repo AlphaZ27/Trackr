@@ -1,8 +1,11 @@
 package com.example.trackr.di
 
+import com.example.trackr.data.repository.ActivityLogRepositoryImpl
+import com.example.trackr.data.repository.AdminDashboardRepositoryImpl
 import com.example.trackr.data.repository.AnalyticsRepositoryImpl
 import com.example.trackr.data.repository.AuthRepositoryImpl
 import com.example.trackr.data.repository.ConfigurationRepositoryImpl
+import com.example.trackr.data.repository.CsatRepositoryImpl
 import com.example.trackr.data.repository.DashboardRepositoryImpl
 import com.example.trackr.data.repository.DataStoreRepositoryImpl
 import com.example.trackr.data.repository.KBRepositoryImpl
@@ -10,8 +13,11 @@ import com.example.trackr.data.repository.ReportingRepositoryImpl
 import com.example.trackr.data.repository.SLARepositoryImpl
 import com.example.trackr.domain.repository.AuthRepository
 import com.example.trackr.data.repository.TicketRepositoryImpl
+import com.example.trackr.domain.repository.ActivityLogRepository
+import com.example.trackr.domain.repository.AdminDashboardRepository
 import com.example.trackr.domain.repository.AnalyticsRepository
 import com.example.trackr.domain.repository.ConfigurationRepository
+import com.example.trackr.domain.repository.CsatRepository
 import com.example.trackr.domain.repository.DashboardRepository
 import com.example.trackr.domain.repository.DataStoreRepository
 import com.example.trackr.domain.repository.KBRepository
@@ -46,6 +52,11 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
+    abstract fun bindAdminDashboardRepository(impl: AdminDashboardRepositoryImpl): AdminDashboardRepository
+
+
+    @Binds
+    @Singleton
     abstract fun bindDataStoreRepository(impl: DataStoreRepositoryImpl): DataStoreRepository
 
     @Binds
@@ -63,4 +74,12 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindReportingRepository(impl: ReportingRepositoryImpl): ReportingRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindActivityLogRepository(impl: ActivityLogRepositoryImpl): ActivityLogRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindCsatRepository(impl: CsatRepositoryImpl): CsatRepository
 }

@@ -16,6 +16,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.trackr.domain.model.Priority
 import com.example.trackr.domain.model.TicketStatus
 import com.example.trackr.feature_tickets.ui.shared.AssigneeDropdown
+import com.example.trackr.feature_tickets.ui.shared.AssigneeSelector
 import com.example.trackr.feature_tickets.ui.shared.CategoryDropdown
 import com.example.trackr.feature_tickets.ui.shared.PriorityDropdown
 import com.example.trackr.feature_tickets.ui.shared.StatusDropdown
@@ -32,33 +33,6 @@ fun UpdateTicketScreen(
     val categoryList by viewModel.categories.collectAsState() // Observe categories
 
     var showDeleteDialog by remember { mutableStateOf(false) }
-
-    // State variables for each editable field
-    var name by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var department by remember { mutableStateOf("") }
-    var assignee by remember { mutableStateOf("") }
-    var resolution by remember { mutableStateOf("") }
-    var priority by remember { mutableStateOf(Priority.Medium) }
-    var status by remember { mutableStateOf(TicketStatus.Open) }
-
-    // This effect runs once to fetch the ticket data
-//    LaunchedEffect(key1 = ticketId) {
-//        viewModel.getTicketById(ticketId)
-//    }
-//
-//    // This effect updates the local state whenever the fetched ticket changes
-//    LaunchedEffect(key1 = ticketState) {
-//        ticketState?.let { ticket ->
-//            name = ticket.name
-//            description = ticket.description
-//            department = ticket.department
-//            assignee = ticket.assignee
-//            resolution = ticket.resolutionDescription
-//            priority = ticket.priority
-//            status = ticket.status
-//        }
-//    }
 
     LaunchedEffect(key1 = updateState) {
         if (updateState is UpdateState.Success) {
@@ -137,6 +111,14 @@ fun UpdateTicketScreen(
             StatusDropdown(
                 selectedStatus = viewModel.status.value,
                 onStatusSelected = { viewModel.status.value = it }
+            )
+            // Smart Assignee Selector
+            AssigneeSelector(
+                userRole = viewModel.currentUserRole.value,
+                currentUserId = viewModel.currentUserId.value,
+                allUsers = users,
+                selectedUser = viewModel.assignee.value,
+                onUserSelected = { viewModel.assignee.value = it }
             )
             AssigneeDropdown(
                 allUsers = users,

@@ -5,6 +5,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.example.trackr.domain.model.ArticleStatus
 import com.example.trackr.domain.model.KBArticle
 import com.example.trackr.domain.model.Feedback
+import com.example.trackr.domain.repository.ActivityLogRepository
 import com.google.firebase.firestore.FieldPath
 import com.example.trackr.domain.repository.KBRepository
 import com.google.firebase.firestore.FieldValue
@@ -18,12 +19,14 @@ import javax.inject.Inject
 
 class KBRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val auth: FirebaseAuth  // get's the current user's id
+    private val auth: FirebaseAuth, // get's the current user's id
+    private val activityLogRepository: ActivityLogRepository
 ) : KBRepository {
 
-    /*
+    /**
     * Gets a real-time stream of all published Knowledge Base articles.
-    * We only want to show published articles in the main list but a filter will be added */
+    * We only want to show published articles in the main list but a filter will be added
+    * */
     override fun getAllArticles(): Flow<List<KBArticle>> = callbackFlow {
         // We only want to show published articles in the main list.
         val listener = firestore.collection("articles")
@@ -88,14 +91,21 @@ class KBRepositoryImpl @Inject constructor(
     * */
     override suspend fun createOrUpdateArticle(article: KBArticle): Result<Unit> {
         return try {
-            val articleWithAuthor = article.copy(authorId = auth.currentUser?.uid ?: "unknown")
-            if (article.id.isBlank()) {
-                // Create new article if ID is blank
+            val isNew = article.id.isBlank()
+            val articleWithAuthor = if (isNew) {
+                article.copy(
+                    authorId = auth.currentUser?.uid ?: "unknown",
+                    createdBy = auth.currentUser?.email ?: "Anonymous"
+                )
+            } else article
+
+            if (isNew) {
                 firestore.collection("articles").add(articleWithAuthor).await()
+                activityLogRepository.logAction("KB_CREATED", "Created article: ${article.title}")
             } else {
-                // Update existing article if ID is present
                 firestore.collection("articles").document(article.id)
                     .set(articleWithAuthor, SetOptions.merge()).await()
+                activityLogRepository.logAction("KB_UPDATED", "Updated article: ${article.title}")
             }
             Result.success(Unit)
         } catch (e: Exception) {
@@ -109,6 +119,7 @@ class KBRepositoryImpl @Inject constructor(
     override suspend fun deleteArticle(articleId: String): Result<Unit> {
         return try {
             firestore.collection("articles").document(articleId).delete().await()
+            activityLogRepository.logAction("KB_DELETED", "Deleted article ID: $articleId")
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -164,6 +175,7 @@ class KBRepositoryImpl @Inject constructor(
     override fun getFrequentArticles(limit: Int): Flow<List<KBArticle>> = callbackFlow {
         val listener = firestore.collection("articles")
             .whereEqualTo("status", ArticleStatus.Published.name)
+            .whereGreaterThan("viewCount", 0)
             .orderBy("viewCount", Query.Direction.DESCENDING) // Simple "Frequent" logic for now
             .limit(limit.toLong())
             .addSnapshotListener { snapshot, error ->
@@ -178,12 +190,13 @@ class KBRepositoryImpl @Inject constructor(
 
     override suspend fun incrementViewCount(articleId: String): Result<Unit> {
         return try {
-            firestore.collection("articles").document(articleId)
-                .update("viewCount", FieldValue.increment(1)) // Atomic increment
-                .await()
+            val updates = mapOf(
+                "viewCount" to FieldValue.increment(1),
+                "lastViewedAt" to FieldValue.serverTimestamp()
+            )
             // Also update 'lastViewedAt' timestamp for recency logic
             firestore.collection("articles").document(articleId)
-                .update("lastViewedAt", FieldValue.serverTimestamp())
+                .update(updates)
                 .await()
             Result.success(Unit)
         } catch (e: Exception) {

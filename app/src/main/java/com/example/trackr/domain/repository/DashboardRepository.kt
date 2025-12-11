@@ -2,6 +2,7 @@ package com.example.trackr.domain.repository
 
 
 import com.example.trackr.domain.model.CategoryStat
+import com.example.trackr.domain.model.DashboardMetrics
 import com.example.trackr.domain.model.DashboardStats
 import com.example.trackr.domain.model.ResolutionTimeStats
 import com.example.trackr.domain.model.User
@@ -12,43 +13,56 @@ import kotlinx.coroutines.flow.Flow
 
 interface DashboardRepository {
 
+    fun getDashboardMetrics(forceRefresh: Boolean = false): Flow<DashboardMetrics>
+
     /**
      * Gets a real-time list of all users (for the Admin).
      */
     fun getAllUsers(): Flow<List<User>>
-
     /**
      * Gets a real-time list of users with the 'User' role (for the Manager).
      */
     fun getStandardUsers(): Flow<List<User>>
 
-    /**
-     * Gets real-time counts of all tickets, grouped by status.
-     */
+    // [Methods for Admin/Manager Dashboards]
     fun getTicketStats(): Flow<DashboardStats>
-
-    /**
-     * Gets real-time counts of all users, grouped by role.
-     */
     fun getUserRoleStats(): Flow<UserRoleStats>
-
-    /**
-     * Gets real-time counts of all tickets, grouped by category.
-     */
     fun getTicketCategoryStats(): Flow<List<CategoryStat>>
-
-    /**
-     * Gets real-time counts of all tickets, grouped by resolution time.
-     */
     fun getTicketResolutionStats(): Flow<ResolutionTimeStats>
 
-    /**
-     * Updates a specific user's role in Firestore.
-     */
+    // User Management
     suspend fun updateUserRole(userId: String, newRole: UserRole): Result<Unit>
+    suspend fun updateUserStatus(userId: String, status: UserStatus): Result<Unit>
 
-    /**
-     * Updates a specific user's status in Firestore.
-     */
-    suspend fun updateUserStatus(userId: String, newStatus: UserStatus): Result<Unit>
+
+//
+//    /**
+//     * Gets real-time counts of all tickets, grouped by status.
+//     */
+//    fun getTicketStats(): Flow<DashboardStats>
+//
+//    /**
+//     * Gets real-time counts of all users, grouped by role.
+//     */
+//    fun getUserRoleStats(): Flow<UserRoleStats>
+//
+//    /**
+//     * Gets real-time counts of all tickets, grouped by category.
+//     */
+//    fun getTicketCategoryStats(): Flow<List<CategoryStat>>
+//
+//    /**
+//     * Gets real-time counts of all tickets, grouped by resolution time.
+//     */
+//    fun getTicketResolutionStats(): Flow<ResolutionTimeStats>
+//
+//    /**
+//     * Updates a specific user's role in Firestore.
+//     */
+//    suspend fun updateUserRole(userId: String, newRole: UserRole): Result<Unit>
+//
+//    /**
+//     * Updates a specific user's status in Firestore.
+//     */
+//    suspend fun updateUserStatus(userId: String, newStatus: UserStatus): Result<Unit>
 }

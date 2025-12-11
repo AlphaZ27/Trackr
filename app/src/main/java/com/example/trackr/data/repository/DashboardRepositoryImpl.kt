@@ -3,12 +3,15 @@ package com.example.trackr.data.repository
 
 import com.example.trackr.domain.model.*
 import com.example.trackr.domain.repository.DashboardRepository
-import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.tasks.await
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -16,157 +19,151 @@ class DashboardRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : DashboardRepository {
 
-    override fun getAllUsers(): Flow<List<User>> = callbackFlow {
-        val listener = firestore.collection("users")
-            .whereEqualTo("status", UserStatus.Active.name)
-            //.orderBy("name")
+    // This ensures the dashboard updates automatically when data changes.
+    override fun getDashboardMetrics(forceRefresh: Boolean): Flow<DashboardMetrics> = callbackFlow {
+        val listener = firestore.collection("tickets")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     close(error)
                     return@addSnapshotListener
                 }
+
+                val tickets = snapshot?.toObjects(Ticket::class.java) ?: emptyList()
+
+                // Calculate metrics immediately on update
+                val metrics = calculateMetrics(tickets)
+                trySend(metrics)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    private fun calculateMetrics(tickets: List<Ticket>): DashboardMetrics {
+        if (tickets.isEmpty()) return DashboardMetrics()
+
+        // Counts
+        val total = tickets.size
+        val open = tickets.count { it.status == TicketStatus.Open }
+        val closed = tickets.count { it.status == TicketStatus.Closed }
+        val inProgress = tickets.count { it.status == TicketStatus.InProgress }
+
+        // SLA Breach Rate
+        val breachedCount = tickets.count { it.slaStatus == SLAStatus.Breached }
+        val breachRate = if (total > 0) (breachedCount.toDouble() / total) * 100 else 0.0
+
+        // Reopen Rate
+        val reopenedCount = tickets.count { it.reopenedCount > 0 }
+        val reopenRate = if (total > 0) (reopenedCount.toDouble() / total) * 100 else 0.0
+
+        // Avg Resolution Time (for Closed tickets only)
+        val closedTicketsList = tickets.filter { it.status == TicketStatus.Closed && it.closedDate != null }
+        val totalResolutionMillis = closedTicketsList.sumOf {
+            (it.closedDate!!.toDate().time - it.createdDate.toDate().time)
+        }
+        val avgResTimeHours = if (closedTicketsList.isNotEmpty()) {
+            TimeUnit.MILLISECONDS.toHours(totalResolutionMillis / closedTicketsList.size).toDouble()
+        } else 0.0
+
+        // Distributions
+        val byStatus = tickets.groupBy { it.status.name }.mapValues { it.value.size }
+        val byPriority = tickets.groupBy { it.priority.name }.mapValues { it.value.size }
+        val byDept = tickets.groupBy { it.department.ifBlank { "Unknown" } }.mapValues { it.value.size }
+
+        // Volume Last 7 Days
+        val volumeList = mutableListOf<Pair<String, Int>>()
+        val dateFormat = SimpleDateFormat("MM-dd", Locale.getDefault())
+
+        for (i in 6 downTo 0) {
+            val targetDay = Calendar.getInstance()
+            targetDay.add(Calendar.DAY_OF_YEAR, -i)
+            val dayStr = dateFormat.format(targetDay.time)
+
+            val count = tickets.count {
+                dateFormat.format(it.createdDate.toDate()) == dayStr
+            }
+            volumeList.add(dayStr to count)
+        }
+
+        return DashboardMetrics(
+            totalTickets = total,
+            openTickets = open,
+            closedTickets = closed,
+            inProgressTickets = inProgress,
+            avgResolutionTimeHours = avgResTimeHours,
+            slaBreachRate = breachRate,
+            reopenRate = reopenRate,
+            ticketsByStatus = byStatus,
+            ticketsByPriority = byPriority,
+            ticketsByDepartment = byDept,
+            ticketVolumeLast7Days = volumeList
+        )
+    }
+
+    override fun getAllUsers(): Flow<List<User>> = callbackFlow {
+        val listener = firestore.collection("users")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { close(error); return@addSnapshotListener }
                 val users = snapshot?.toObjects(User::class.java) ?: emptyList()
-                trySend(users).isSuccess
+                trySend(users)
             }
         awaitClose { listener.remove() }
     }
 
     override fun getStandardUsers(): Flow<List<User>> = callbackFlow {
         val listener = firestore.collection("users")
-            .whereEqualTo("role", UserRole.User.name) // Query for "User" role
+            .whereEqualTo("role", UserRole.User.name)
             .whereEqualTo("status", UserStatus.Active.name)
-            //.orderBy("name")
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
+                if (error != null) { close(error); return@addSnapshotListener }
                 val users = snapshot?.toObjects(User::class.java) ?: emptyList()
-                trySend(users).isSuccess
+                trySend(users)
             }
         awaitClose { listener.remove() }
     }
 
+    // --- Admin Stats Implementations ---
+
     override fun getTicketStats(): Flow<DashboardStats> = callbackFlow {
-        val listener = firestore.collection("tickets")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                val tickets = snapshot?.toObjects(Ticket::class.java) ?: emptyList()
-
-                // Perform the counts client-side on the real-time list
-                val open = tickets.count { it.status == TicketStatus.Open || it.status == TicketStatus.InProgress }
-                val closed = tickets.count { it.status == TicketStatus.Closed }
-
-                trySend(DashboardStats(
-                    openTickets = open,
-                    closedTickets = closed,
-                    totalTickets = tickets.size
-                )).isSuccess
-            }
+        val listener = firestore.collection("tickets").addSnapshotListener { snapshot, _ ->
+            val tickets = snapshot?.toObjects(Ticket::class.java) ?: emptyList()
+            val total = tickets.size
+            val open = tickets.count { it.status == TicketStatus.Open }
+            val closed = tickets.count { it.status == TicketStatus.Closed }
+            val inProgress = tickets.count { it.status == TicketStatus.InProgress }
+            val status = open + closed + inProgress
+            trySend(DashboardStats(total, status))
+        }
         awaitClose { listener.remove() }
     }
 
     override fun getUserRoleStats(): Flow<UserRoleStats> = callbackFlow {
-        // Query for active users, consistent with the other dashboard lists
-        val listener = firestore.collection("users")
-            .whereEqualTo("status", UserStatus.Active.name)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                val users = snapshot?.toObjects(User::class.java) ?: emptyList()
-
-                // Perform counts client-side
-                val adminCount = users.count { it.role == UserRole.Admin }
-                val managerCount = users.count { it.role == UserRole.Manager }
-                val userCount = users.count { it.role == UserRole.User }
-
-                trySend(UserRoleStats(
-                    adminCount = adminCount,
-                    managerCount = managerCount,
-                    userCount = userCount,
-                    totalUsers = users.size
-                )).isSuccess
-            }
+        val listener = firestore.collection("users").addSnapshotListener { snapshot, _ ->
+            val users = snapshot?.toObjects(User::class.java) ?: emptyList()
+            val admins = users.count { it.role == UserRole.Admin }
+            val managers = users.count { it.role == UserRole.Manager }
+            val usersCount = users.count { it.role == UserRole.User }
+            trySend(UserRoleStats(admins, managers, usersCount))
+        }
         awaitClose { listener.remove() }
     }
 
     override fun getTicketCategoryStats(): Flow<List<CategoryStat>> = callbackFlow {
-        // This query just gets all tickets
-        val listener = firestore.collection("tickets")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                val tickets = snapshot?.toObjects(Ticket::class.java) ?: emptyList()
-
-                // Group by category and count them client-side
-                val stats = tickets
-                    .groupBy { it.category }
-                    .map { (category, ticketList) ->
-                        CategoryStat(category = category, count = ticketList.size)
-                    }
-                    .sortedByDescending { it.count } // Sort to show biggest slices first
-
-                trySend(stats).isSuccess
-            }
+        val listener = firestore.collection("tickets").addSnapshotListener { snapshot, _ ->
+            val tickets = snapshot?.toObjects(Ticket::class.java) ?: emptyList()
+            val stats = tickets.groupBy { it.category }
+                .map { (cat, list) -> CategoryStat(cat, list.size) }
+            trySend(stats)
+        }
         awaitClose { listener.remove() }
     }
 
-    override fun getTicketResolutionStats(): Flow<ResolutionTimeStats> = callbackFlow {
-        val listener = firestore.collection("tickets")
-            // We only care about tickets that are closed
-            .whereEqualTo("status", TicketStatus.Closed.name)
-            // We only care about tickets that have a closedAt timestamp
-            .whereNotEqualTo("closedAt", null)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                val tickets = snapshot?.toObjects(Ticket::class.java) ?: emptyList()
-
-                // Calculate the resolution time in milliseconds for each ticket
-                val resolutionTimesInMillis = tickets.mapNotNull { ticket ->
-                    val createdAt = ticket.createdDate.toDate().time
-                    val closedAt = ticket.closedAt?.toDate()?.time
-                    if (closedAt != null) {
-                        closedAt - createdAt
-                    } else {
-                        null
-                    }
-                }
-
-                if (resolutionTimesInMillis.isEmpty()) {
-                    // No data, send default stats
-                    trySend(ResolutionTimeStats()).isSuccess
-                } else {
-                    // Calculate stats in hours
-                    val avgInMillis = resolutionTimesInMillis.average()
-                    val minInMillis = resolutionTimesInMillis.minOrNull()
-                    val maxInMillis = resolutionTimesInMillis.maxOrNull()
-
-                    val toHours = { millis: Double -> millis / (1000 * 60 * 60) }
-
-                    trySend(ResolutionTimeStats(
-                        averageResolutionHours = toHours(avgInMillis),
-                        fastestResolutionHours = minInMillis?.let { toHours(it.toDouble()) },
-                        slowestResolutionHours = maxInMillis?.let { toHours(it.toDouble()) }
-                    )).isSuccess
-                }
-            }
-        awaitClose { listener.remove() }
+    override fun getTicketResolutionStats(): Flow<ResolutionTimeStats> = kotlinx.coroutines.flow.flow {
+        emit(ResolutionTimeStats())
     }
 
     override suspend fun updateUserRole(userId: String, newRole: UserRole): Result<Unit> {
         return try {
             firestore.collection("users").document(userId)
-                .update("role", newRole.name) // Update the role field to the enum's string name
+                .update("role", newRole.name)
                 .await()
             Result.success(Unit)
         } catch (e: Exception) {
@@ -174,10 +171,10 @@ class DashboardRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun updateUserStatus(userId: String, newStatus: UserStatus): Result<Unit> {
+    override suspend fun updateUserStatus(userId: String, status: UserStatus): Result<Unit> {
         return try {
             firestore.collection("users").document(userId)
-                .update("status", newStatus.name)
+                .update("status", status.name)
                 .await()
             Result.success(Unit)
         } catch (e: Exception) {

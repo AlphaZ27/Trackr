@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.trackr.domain.model.KBArticle
 import com.example.trackr.domain.model.Ticket
 import com.example.trackr.domain.model.TicketStatus
@@ -45,6 +46,10 @@ fun TicketDetailScreen(
     val ticket by viewModel.selectedTicket.collectAsState()
     val detailState by viewModel.detailState.collectAsState()
     val linkedArticles by viewModel.linkedArticles.collectAsState()
+
+    // Customer Satisfaction State
+    var showCsatDialog by remember { mutableStateOf(false) }
+    var tempRating by remember { mutableIntStateOf(0) }
 
     // State for the dialog
     var showLinkDialog by remember { mutableStateOf(false) }
@@ -93,7 +98,10 @@ fun TicketDetailScreen(
                 onLinkArticleClick = { showLinkDialog = true }, // Open dialog
                 onUnlinkArticle = { articleId -> viewModel.unlinkArticle(ticketId, articleId) },
                 onNavigateToArticle = onNavigateToArticle,
-                onSubmitCsat = onSubmitCsat
+                onRateClick = { rating ->
+                    tempRating = rating
+                    showCsatDialog = true
+                }
             )
         }
         if (showLinkDialog) {
@@ -103,6 +111,23 @@ fun TicketDetailScreen(
                 onArticleSelected = { articleId ->
                     viewModel.linkArticle(ticketId, articleId)
                     showLinkDialog = false
+                }
+            )
+        }
+
+        if (showCsatDialog) {
+            CsatSurveyDialog(
+                initialRating = tempRating,
+                onDismiss = { showCsatDialog = false },
+                onSubmit = { rating, comment, helpful ->
+                    viewModel.submitCsat(
+                        ticketId = ticketId,
+                        rating = rating,
+                        comment = comment,
+                        isHelpful = helpful,
+                        technicianId = ticket?.assignee ?: ""
+                    )
+                    showCsatDialog = false
                 }
             )
         }
@@ -157,7 +182,7 @@ private fun TicketDetailContent(
     onLinkArticleClick: () -> Unit,
     onUnlinkArticle: (String) -> Unit,
     onNavigateToArticle: (String) -> Unit,
-    onSubmitCsat: (Int) -> Unit
+    onRateClick: (Int) -> Unit
 ) {
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy 'at' hh:mm a", Locale.getDefault()) }
 
@@ -254,10 +279,7 @@ private fun TicketDetailContent(
             item {
                 CsatRatingCard(
                     currentScore = ticket.csatScore,
-                    onRate = { score ->
-                        // You need to pass this callback up from the Screen
-                        onSubmitCsat(score)
-                    }
+                    onRate = { rating -> onRateClick(rating) }
                 )
             }
         }
@@ -297,6 +319,58 @@ private fun TicketDetailContent(
             Spacer(Modifier.height(64.dp))
         }
     }
+}
+
+@Composable
+fun CsatSurveyDialog(
+    initialRating: Int,
+    onDismiss: () -> Unit,
+    onSubmit: (Int, String, Boolean) -> Unit
+) {
+    var rating by remember { mutableIntStateOf(initialRating) }
+    var comment by remember { mutableStateOf("") }
+    var isHelpful by remember { mutableStateOf(true) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rate Support Quality") },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(modifier = Modifier.padding(bottom = 16.dp)) {
+                    for (i in 1..5) {
+                        Icon(
+                            imageVector = if (i <= rating) Icons.Default.Star else Icons.Default.StarBorder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(40.dp).clickable { rating = i }
+                        )
+                    }
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                ) {
+                    Text("Was this solution helpful?", modifier = Modifier.weight(1f))
+                    Switch(checked = isHelpful, onCheckedChange = { isHelpful = it })
+                }
+                OutlinedTextField(
+                    value = comment,
+                    onValueChange = { comment = it },
+                    label = { Text("Optional Comment") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSubmit(rating, comment, isHelpful) }) {
+                Text("Submit Feedback")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
